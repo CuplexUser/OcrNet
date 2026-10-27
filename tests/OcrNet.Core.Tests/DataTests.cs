@@ -197,4 +197,84 @@ public class DataTests
         Assert.Equal("Custom", custom.Name);
         Assert.Equal(3, CharacterSet.Custom("+ - = +").Count);
     }
+
+    /// <summary>
+    /// Writes a two-item MNIST-style image/label pair into a fresh temp folder (names may include
+    /// subfolders) and returns the folder.
+    /// </summary>
+    private static string WriteMnist(string imagesName, string labelsName, bool gzipLabels)
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "ocrnet-tests", Guid.NewGuid().ToString("N"));
+        byte[] BigEndian(params int[] values) => [.. values.SelectMany(v => BitConverter.GetBytes(System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(v)))];
+        string images = Path.Combine(folder, imagesName), labels = Path.Combine(folder, labelsName);
+        Directory.CreateDirectory(Path.GetDirectoryName(images)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(labels)!);
+        File.WriteAllBytes(images, [.. BigEndian(0x803, 2, 2, 2), 0, 255, 255, 0, 255, 0, 0, 255]);
+        using (var file = File.Create(labels))
+        using (Stream stream = gzipLabels ? new System.IO.Compression.GZipStream(file, System.IO.Compression.CompressionLevel.Fastest) : file)
+            stream.Write([.. BigEndian(0x801, 2), 3, 7]);
+        return folder;
+    }
+
+    [Fact]
+    public void MnistReader_FindsLabelsNextToImages_AndDetectsGzipByContent()
+    {
+        // Gzipped labels without a ".gz" extension, as some browsers leave them.
+        string folder = WriteMnist("t10k-images-idx3-ubyte", "t10k-labels-idx1-ubyte", gzipLabels: true);
+        try
+        {
+            string images = Path.Combine(folder, "t10k-images-idx3-ubyte");
+            Assert.Equal(Path.Combine(folder, "t10k-labels-idx1-ubyte"), MnistReader.FindLabelsFile(images));
+            var set = MnistReader.Read(images);
+            Assert.Equal(2, set.Count);
+            Assert.Equal([3, 7], set.Labels);
+            Assert.Equal(1f, set.Image(0)[1, 0]);
+            Assert.Equal(0f, set.Image(1)[1, 0]);
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    [Fact]
+    public void MnistReader_FindsFilesUnzippedIntoFoldersOfTheirOwnName()
+    {
+        // The layout some unzip tools produce: each file inside a folder named after the archive.
+        string folder = WriteMnist(@"train-images-idx3-ubyte\train-images.idx3-ubyte", @"train-labels-idx1-ubyte\train-labels.idx1-ubyte", gzipLabels: false);
+        try
+        {
+            string images = Path.Combine(folder, "train-images-idx3-ubyte", "train-images.idx3-ubyte");
+            Assert.Equal(Path.Combine(folder, "train-labels-idx1-ubyte", "train-labels.idx1-ubyte"), MnistReader.FindLabelsFile(images));
+            Assert.Null(MnistReader.FindTestImagesFile(images));
+
+            string test = Path.Combine(folder, "t10k-images-idx3-ubyte", "t10k-images.idx3-ubyte");
+            Directory.CreateDirectory(Path.GetDirectoryName(test)!);
+            File.Copy(images, test);
+            Assert.Equal(test, MnistReader.FindTestImagesFile(images));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    [Fact]
+    public void MnistReader_FindsKaggleStyleNames_AndRejectsSwappedFiles()
+    {
+        string folder = WriteMnist("t10k-images.idx3-ubyte", "t10k-labels.idx1-ubyte.gz", gzipLabels: true);
+        try
+        {
+            string images = Path.Combine(folder, "t10k-images.idx3-ubyte");
+            string labels = Path.Combine(folder, "t10k-labels.idx1-ubyte.gz");
+            Assert.Equal(labels, MnistReader.FindLabelsFile(images));
+            Assert.Null(MnistReader.FindLabelsFile(Path.Combine(folder, "digits.bin")));
+            var error = Assert.Throws<InvalidDataException>(() => MnistReader.Read(labels, images));
+            Assert.Contains("labels file", error.Message);
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
 }

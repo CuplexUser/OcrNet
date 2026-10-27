@@ -48,7 +48,17 @@ public sealed partial class DatasetViewModel : ObservableObject
         FontsView = CollectionViewSource.GetDefaultView(Fonts);
         FontsView.Filter = o => o is FontItem f &&
             (string.IsNullOrWhiteSpace(FontFilter) || f.Family.Contains(FontFilter, StringComparison.OrdinalIgnoreCase));
+        state.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(AppState.MnistTraining) or nameof(AppState.Network))
+            {
+                OnPropertyChanged(nameof(HasMnist));
+                OnPropertyChanged(nameof(MnistSummary));
+                RemoveMnistCommand.NotifyCanExecuteChanged();
+            }
+        };
         _ = LoadFontsAsync();
+        _ = state.RestoreMnistTrainingAsync();
     }
 
     public DatasetOptions Options => _state.DatasetOptions;
@@ -94,6 +104,20 @@ public sealed partial class DatasetViewModel : ObservableObject
                   string.Join("  ", counts.OrderBy(c => c.Key).Select(c => $"{c.Key}×{c.Value}"));
         }
     }
+
+    public bool HasMnist => _state.MnistTraining is not null;
+
+    public string MnistSummary => _state.MnistTraining switch
+    {
+        null => "Not loaded. Add the MNIST training set (train-images-idx3-ubyte, 60,000 handwritten digits) to train on real handwriting, " +
+                "then verify with the t10k test set.",
+        var m when _state.CharacterSet.ClassOf('0') < 0 =>
+            $"{m.Count:N0} digits from {System.IO.Path.GetFileName(m.ImagesPath)}, but the current network has no digit classes, so they are not used.",
+        var m => $"{m.Count:N0} handwritten digits from {System.IO.Path.GetFileName(m.ImagesPath)}. " +
+                 (MnistReader.FindTestImagesFile(m.ImagesPath) is not null
+                     ? "The matching t10k test set was found; it is checked automatically after each training run."
+                     : "No matching t10k test set was found next to it; verify with “Evaluate on MNIST…” on the Training tab."),
+    };
 
     private bool Has(FontVariant v) => _state.SelectedVariants.Contains(v);
 
@@ -184,7 +208,8 @@ public sealed partial class DatasetViewModel : ObservableObject
                 PreviewSamples.Add(new PreviewSample(BitmapFactory.Grayscale(input, size, size), CharacterSet.Display(set.Classes[label])));
             PreviewStatus = $"{data.TrainFontCount} training faces ({data.TrainGlyphCount:N0} glyphs) · " +
                             $"{data.ValidationFontCount} held-out faces for validation ({data.ValidationSampleCount:N0} samples) · " +
-                            $"{data.UserSampleCount} of your drawings";
+                            $"{data.UserSampleCount} of your drawings" +
+                            (data.MnistSampleCount > 0 ? $" · {data.MnistSampleCount:N0} MNIST digits" : "");
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
@@ -205,6 +230,35 @@ public sealed partial class DatasetViewModel : ObservableObject
         _state.UserSamples.Save(UserSampleStore.DefaultPath);
         RefreshUserSamples();
     }
+
+    [RelayCommand]
+    private async Task LoadMnistAsync()
+    {
+        if (MnistFiles.Pick("MNIST training images (e.g. train-images-idx3-ubyte[.gz])", null) is not var (images, labels))
+            return;
+        if (System.IO.Path.GetFileName(images).Contains("t10k", StringComparison.OrdinalIgnoreCase) &&
+            MessageDialog.Show("This looks like the MNIST test set. Training on it leaves nothing unseen to verify with; " +
+                               "the training set is train-images-idx3-ubyte. Use it anyway?",
+                "OcrNet – MNIST", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        try
+        {
+            IsBusy = true;
+            var set = await Task.Run(() => MnistReader.Read(images, labels));
+            _state.SetMnistTraining(set, labels);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or System.IO.InvalidDataException or UnauthorizedAccessException)
+        {
+            MessageDialog.Show(ex.Message, "OcrNet – MNIST", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasMnist))]
+    private void RemoveMnist() => _state.SetMnistTraining(null, null);
 
     public void RefreshUserSamples()
     {

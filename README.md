@@ -128,6 +128,11 @@ The window has five tabs.
   - How often your own drawings are mixed into training.
 - **Your drawings**: characters you correct on the Recognize tab are stored in
   `%LOCALAPPDATA%\OcrNet\user-samples.bin` and mixed into training.
+- **MNIST handwritten digits**: load the MNIST training set (`train-images-idx3-ubyte`, plain or
+  `.gz`) to mix 60,000 real handwritten digits into the digit classes. A slider sets how often a
+  digit sample comes from MNIST. The labels file is found by name next to the images, or in a
+  sibling folder when an unzip tool put each file in a folder of its own. The choice is remembered
+  between sessions.
 
 ### 3. Training
 
@@ -139,8 +144,9 @@ The window has five tabs.
 - When training ends, a validation confusion matrix (hover a cell for counts) and the most
   confident mistakes.
 - **Evaluate on MNIST…**: if you have the MNIST IDX files (`t10k-images-idx3-ubyte` and
-  `t10k-labels-idx1-ubyte`), this measures how a font-trained digit model does on real
-  handwriting.
+  `t10k-labels-idx1-ubyte`), this measures how a digit model does on real handwriting. When the
+  MNIST training set is loaded on the Dataset tab and the `t10k` test set sits next to it, the
+  test set is checked automatically after every training run and the result is written to the log.
 
 ### 4. Recognize
 

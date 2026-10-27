@@ -25,6 +25,7 @@ public sealed partial class TrainingViewModel : ObservableObject
     private CancellationTokenSource? _cts;
     private Trainer? _trainer;
     private int _firstEpoch = 1;
+    private MnistSet? _mnistTest;
 
     public TrainingViewModel(AppState state)
     {
@@ -221,6 +222,7 @@ public sealed partial class TrainingViewModel : ObservableObject
             network.Metadata.Preprocessing = _state.DatasetOptions.Normalizer.ToDictionary();
             AddLog($"Dataset: {data.TrainFontCount} training faces, {data.ValidationFontCount} held-out faces " +
                    $"({data.ValidationSampleCount:N0} validation samples), {data.UserSampleCount} user drawings, " +
+                   (data.MnistSampleCount > 0 ? $"{data.MnistSampleCount:N0} MNIST digits, " : "") +
                    $"{data.TrainSamplesPerEpoch:N0} augmented samples per epoch.");
 
             Phase = "Preparing validation set";
@@ -244,7 +246,8 @@ public sealed partial class TrainingViewModel : ObservableObject
                 : "finished";
             AddLog($"Training {outcome} after {result.Duration:mm\\:ss}. Best epoch {result.BestEpoch}" +
                    (result.FinalValidation is { } v ? $", validation accuracy {v.Accuracy:P2}." : "."));
-            Phase = $"Done – {outcome}";
+            string? mnist = result.Diverged ? null : await VerifyOnMnistTestAsync();
+            Phase = $"Done – {outcome}" + (mnist is null ? "" : $" · {mnist}");
             _state.Status = $"Training {outcome}";
         }
         catch (OperationCanceledException)
@@ -339,46 +342,85 @@ public sealed partial class TrainingViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task EvaluateMnistAsync()
     {
-        var network = _state.Network!;
-        var set = _state.CharacterSet;
-        if (set.ClassOf('0') < 0)
+        if (_state.CharacterSet.ClassOf('0') < 0)
         {
             MessageDialog.Show("MNIST contains digits; the current network has no digit classes.", "OcrNet");
             return;
         }
-        var images = new OpenFileDialog { Title = "MNIST images (e.g. t10k-images-idx3-ubyte[.gz])", Filter = "IDX images|*idx3*|All files|*.*" };
-        if (images.ShowDialog(Application.Current.MainWindow) != true)
-            return;
-        var labels = new OpenFileDialog { Title = "MNIST labels (e.g. t10k-labels-idx1-ubyte[.gz])", Filter = "IDX labels|*idx1*|All files|*.*", InitialDirectory = System.IO.Path.GetDirectoryName(images.FileName) };
-        if (labels.ShowDialog(Application.Current.MainWindow) != true)
+        // Start where the test set is likely to be: next to the MNIST training files, if loaded.
+        string? training = _state.MnistTraining?.ImagesPath;
+        string? folder = training is null ? null
+            : System.IO.Path.GetDirectoryName(MnistReader.FindTestImagesFile(training) ?? training);
+        if (MnistFiles.Pick("MNIST test images (e.g. t10k-images-idx3-ubyte[.gz])", folder) is not var (images, labels))
             return;
 
         Phase = "Evaluating on MNIST…";
-        var normalizer = _state.Normalizer;
         try
         {
-            var (accuracy, count) = await Task.Run(() =>
-            {
-                var (imgs, lbls) = MnistReader.Read(images.FileName, labels.FileName);
-                int correct = 0;
-                var input = new float[network.InputShape.Size];
-                for (int i = 0; i < imgs.Count; i++)
-                {
-                    Normalizer.Normalize(imgs[i], normalizer, input);
-                    var probabilities = network.Predict(input);
-                    int predicted = Array.IndexOf(probabilities, probabilities.Max());
-                    if (network.Labels[predicted].Contains((char)('0' + lbls[i])))
-                        correct++;
-                }
-                return ((double)correct / imgs.Count, imgs.Count);
-            });
-            AddLog($"MNIST evaluation: {accuracy:P2} correct on {count:N0} handwritten digits.");
+            var test = await Task.Run(() => MnistReader.Read(images, labels));
+            var (accuracy, count) = await EvaluateMnistAsync(test);
+            string result = $"MNIST evaluation: {accuracy:P2} correct on {count:N0} handwritten digits from {System.IO.Path.GetFileName(images)}.";
+            AddLog(result);
             Phase = $"MNIST accuracy {accuracy:P2}";
+            bool trainedOn = training is not null
+                && System.IO.Path.GetFullPath(training).Equals(System.IO.Path.GetFullPath(images), StringComparison.OrdinalIgnoreCase);
+            MessageDialog.Show(result + (trainedOn
+                    ? "\n\nThese are the digits loaded for training on the Dataset tab, so this overstates accuracy on new handwriting. Use the t10k test files to verify."
+                    : ""),
+                "OcrNet – MNIST", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        catch (Exception ex) when (ex is System.IO.IOException or System.IO.InvalidDataException)
+        catch (Exception ex) when (ex is System.IO.IOException or System.IO.InvalidDataException or UnauthorizedAccessException)
         {
             Phase = "MNIST evaluation failed";
             MessageDialog.Show(ex.Message, "OcrNet – MNIST", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>Fraction of <paramref name="set"/> the current network classifies correctly, and the number of digits.</summary>
+    private Task<(double Accuracy, int Count)> EvaluateMnistAsync(MnistSet set)
+    {
+        var network = _state.Network!;
+        var normalizer = _state.Normalizer;
+        var classes = _state.CharacterSet;
+        return Task.Run(() =>
+        {
+            var inputs = new float[set.Count][];
+            var labels = new int[set.Count];
+            Parallel.For(0, set.Count, Core.Compute.Parallelism.Options, i =>
+            {
+                inputs[i] = Normalizer.Normalize(set.Image(i), normalizer);
+                labels[i] = classes.ClassOf((char)('0' + set.Labels[i]));
+            });
+            // A custom character set may lack some digits; those cannot be answered and are left out.
+            var known = Enumerable.Range(0, set.Count).Where(i => labels[i] >= 0).ToArray();
+            var batches = InMemoryTrainingData.ToBatches([.. known.Select(i => inputs[i])], [.. known.Select(i => labels[i])], network.InputShape, 256);
+            var result = Evaluator.Evaluate(network, batches, keepWorst: 0);
+            return ((double)result.Accuracy, result.Count);
+        });
+    }
+
+    /// <summary>
+    /// After training with MNIST digits, verifies the network on the matching MNIST test set (digits it
+    /// never trained on), when that can be found next to the training files.
+    /// </summary>
+    private async Task<string?> VerifyOnMnistTestAsync()
+    {
+        if (_state.MnistTraining is not { } training || _state.CharacterSet.ClassOf('0') < 0
+            || MnistReader.FindTestImagesFile(training.ImagesPath) is not { } testImages)
+            return null;
+        try
+        {
+            Phase = "Verifying on the MNIST test set…";
+            if (_mnistTest?.ImagesPath != testImages)
+                _mnistTest = await Task.Run(() => MnistReader.Read(testImages));
+            var (accuracy, count) = await EvaluateMnistAsync(_mnistTest);
+            AddLog($"MNIST test set: {accuracy:P2} correct on {count:N0} handwritten digits not used for training.");
+            return $"MNIST test {accuracy:P2}";
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or System.IO.InvalidDataException or UnauthorizedAccessException)
+        {
+            AddLog($"MNIST test set could not be read: {ex.Message}");
+            return null;
         }
     }
 }

@@ -20,6 +20,9 @@ public sealed class DatasetOptions
     /// <summary>Probability that a training sample of a class uses one of the user's drawings, when available.</summary>
     public float UserSampleProbability { get; set; } = 0.3f;
 
+    /// <summary>Probability that a training sample of a digit class uses an MNIST digit, when MNIST is loaded.</summary>
+    public float MnistProbability { get; set; } = 0.5f;
+
     public AugmentationOptions Augmentation { get; set; } = new();
 
     public NormalizerOptions Normalizer { get; set; } = new();
@@ -34,7 +37,7 @@ public sealed class DatasetOptions
 }
 
 /// <summary>
-/// Training data generated from rendered font glyphs (plus optional user drawings). Each epoch draws
+/// Training data generated from rendered font glyphs (plus optional user drawings and MNIST digits). Each epoch draws
 /// <see cref="DatasetOptions.SamplesPerClass"/> balanced samples per class, applies random
 /// augmentation and the shared <see cref="Normalizer"/>. Validation uses held-out font families.
 /// </summary>
@@ -44,12 +47,14 @@ public sealed class GlyphDataset : ITrainingData
     private readonly DatasetOptions _options;
     private readonly GrayImage[][] _trainSources;   // per class
     private readonly GrayImage[][] _userSources;    // per class
+    private readonly MnistSet? _mnist;
+    private readonly int[][] _mnistIndices;         // per class: indices into _mnist
     private readonly List<(GrayImage Image, int Label)> _validationSources = [];
     private List<Batch>? _validationBatches;
     private int _validationBatchSize;
 
     public GlyphDataset(CharacterSet set, IReadOnlyList<FontFace> faces, GlyphCache cache, DatasetOptions options,
-        UserSampleStore? userSamples, ulong seed)
+        UserSampleStore? userSamples, ulong seed, MnistSet? mnist = null)
     {
         _set = set;
         _options = options.Clone();
@@ -98,6 +103,17 @@ public sealed class GlyphDataset : ITrainingData
         }
         _userSources = [.. user.Select(l => l.ToArray())];
 
+        _mnist = mnist;
+        var digits = Enumerable.Range(0, set.Count).Select(_ => new List<int>()).ToArray();
+        for (int i = 0; i < (mnist?.Count ?? 0); i++)
+        {
+            int label = set.ClassOf((char)('0' + mnist!.Labels[i]));
+            if (label >= 0)
+                digits[label].Add(i);
+        }
+        _mnistIndices = [.. digits.Select(l => l.ToArray())];
+        MnistSampleCount = _mnistIndices.Sum(s => s.Length);
+
         TrainFontCount = faces.Count(f => !validationFamilies.Contains(f.Family));
         ValidationFontCount = faces.Count - TrainFontCount;
         TrainGlyphCount = _trainSources.Sum(s => s.Length);
@@ -119,6 +135,9 @@ public sealed class GlyphDataset : ITrainingData
     public int TrainGlyphCount { get; }
 
     public int UserSampleCount { get; }
+
+    /// <summary>MNIST digits that belong to one of the classes (0 when MNIST is not loaded).</summary>
+    public int MnistSampleCount { get; }
 
     public int ValidationSampleCount => _validationSources.Count * (1 + _options.ValidationAugmentations);
 
@@ -142,11 +161,7 @@ public sealed class GlyphDataset : ITrainingData
             for (int i = 0; i < count; i++)
             {
                 int label = labels[start + i];
-                var user = _userSources[label];
-                GrayImage source = user.Length > 0 && rng.NextFloat() < _options.UserSampleProbability
-                    ? user[rng.Next(user.Length)]
-                    : _trainSources[label][rng.Next(_trainSources[label].Length)];
-                MakeSample(source, rng, augment: true, batch.Inputs.Sample(i));
+                MakeSample(PickSource(label, rng), rng, augment: true, batch.Inputs.Sample(i));
                 batch.Labels[i] = label;
             }
         }, cancellationToken);
@@ -178,6 +193,21 @@ public sealed class GlyphDataset : ITrainingData
         return _validationBatches;
     }
 
+    /// <summary>A source image for one training sample of <paramref name="label"/>: a user drawing, an MNIST digit or a font glyph.</summary>
+    private GrayImage PickSource(int label, FastRandom rng)
+    {
+        var user = _userSources[label];
+        if (user.Length > 0 && rng.NextFloat() < _options.UserSampleProbability)
+            return user[rng.Next(user.Length)];
+        var mnist = _mnistIndices[label];
+        if (mnist.Length > 0 && rng.NextFloat() < _options.MnistProbability)
+        {
+            // Brought into the 64×64 glyph format, so augmentation treats it like any other source.
+            return Normalizer.FitToSquare(_mnist!.Image(mnist[rng.Next(mnist.Length)]), GlyphRenderer.Size, GlyphRenderer.Fit);
+        }
+        return _trainSources[label][rng.Next(_trainSources[label].Length)];
+    }
+
     /// <summary>Augmented, normalized samples for the dataset preview.</summary>
     public List<(float[] Input, int Label)> Preview(int count, ulong seed)
     {
@@ -186,9 +216,8 @@ public sealed class GlyphDataset : ITrainingData
         for (int i = 0; i < count; i++)
         {
             int label = rng.Next(_set.Count);
-            var sources = _trainSources[label];
             var input = new float[InputShape.Size];
-            MakeSample(sources[rng.Next(sources.Length)], rng, augment: true, input);
+            MakeSample(PickSource(label, rng), rng, augment: true, input);
             result.Add((input, label));
         }
         return result;

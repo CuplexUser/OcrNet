@@ -148,6 +148,19 @@
                             <TextBlock Text="Your handwriting" Style="{StaticResource SectionTitle}" Margin="0,18,0,8" />
                             <TextBlock Text="{Binding UserSampleSummary}" Style="{StaticResource Caption}" />
                             <Button Content="Delete my drawings" Command="{Binding ClearUserSamplesCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+
+                            <TextBlock Text="MNIST handwritten digits" Style="{StaticResource SectionTitle}" Margin="0,18,0,8" />
+                            <TextBlock Text="{Binding MnistSummary}" Style="{StaticResource Caption}" />
+                            <Grid Style="{StaticResource SliderRow}" Margin="0,8,0,0" IsEnabled="{Binding HasMnist}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Use MNIST digits (chance)" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Options.MnistProbability}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Options.MnistProbability, StringFormat={}{0:P0}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="Load MNIST training set…" Command="{Binding LoadMnistCommand}" Margin="0,0,8,0" />
+                                <Button Content="Remove" Command="{Binding RemoveMnistCommand}" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </Grid>

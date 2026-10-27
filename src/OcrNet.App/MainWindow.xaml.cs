@@ -43,7 +43,8 @@ public partial class MainWindow : Window
             train: args.Contains("--train"),
             recognize: RecognizePage,
             drawText: Option("--draw"),
-            fontTestText: Option("--font-test"));
+            fontTestText: Option("--font-test"),
+            mnistImages: Option("--mnist"));
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)

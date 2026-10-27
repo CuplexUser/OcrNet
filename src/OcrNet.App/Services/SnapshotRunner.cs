@@ -8,17 +8,19 @@ using OcrNet.App.ViewModels;
 namespace OcrNet.App.Services;
 
 /// <summary>
-/// Developer smoke test: <c>OcrNet.App.exe --snapshot &lt;folder&gt; [--train] [--draw &lt;text&gt;] [--font-test &lt;text&gt;]</c>
-/// optionally trains the default network briefly, draws a sample, runs the font test, renders every
+/// Developer smoke test: <c>OcrNet.App.exe --snapshot &lt;folder&gt; [--train] [--mnist &lt;train images&gt;] [--draw &lt;text&gt;] [--font-test &lt;text&gt;]</c>
+/// optionally trains the default network briefly (with MNIST digits mixed in, for this run only), draws a sample, runs the font test, renders every
 /// tab offscreen to PNG files, checks that Esc clears the canvas (checks.txt), captures line mode at the minimum width and exits. Works without an interactive desktop (e.g. a locked session or CI).
 /// </summary>
 public static class SnapshotRunner
 {
     public static async Task RunAsync(Window window, MainViewModel vm, string folder, bool train, Views.RecognizeView? recognize,
-        string? drawText, string? fontTestText)
+        string? drawText, string? fontTestText, string? mnistImages = null)
     {
         Directory.CreateDirectory(folder);
         await Idle();
+        if (mnistImages is not null)
+            vm.State.MnistTraining = Data.Datasets.MnistReader.Read(mnistImages);
         if (train)
         {
             vm.State.TrainingOptions.Epochs = 3;

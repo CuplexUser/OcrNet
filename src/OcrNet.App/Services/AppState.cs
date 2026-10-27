@@ -61,6 +61,52 @@ public sealed partial class AppState : ObservableObject
 
     public UserSampleStore UserSamples { get; } = UserSampleStore.Load(UserSampleStore.DefaultPath);
 
+    /// <summary>MNIST handwritten digits mixed into training (null when none are loaded).</summary>
+    [ObservableProperty]
+    public partial MnistSet? MnistTraining { get; set; }
+
+    /// <summary>Remembers which MNIST training files were loaded, so they are loaded again on the next start.</summary>
+    private static string MnistSettingsPath =>
+        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OcrNet", "mnist-training.txt");
+
+    /// <summary>Uses <paramref name="set"/> (or nothing) as MNIST training data, now and in later sessions.</summary>
+    public void SetMnistTraining(MnistSet? set, string? labelsPath)
+    {
+        MnistTraining = set;
+        try
+        {
+            if (set is null)
+                System.IO.File.Delete(MnistSettingsPath);
+            else
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(MnistSettingsPath)!);
+                System.IO.File.WriteAllLines(MnistSettingsPath, [set.ImagesPath, labelsPath ?? ""]);
+            }
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            // Only the convenience of reloading next time is lost.
+        }
+    }
+
+    /// <summary>Loads the MNIST training files of the previous session, if there were any and they still exist.</summary>
+    public async Task RestoreMnistTrainingAsync()
+    {
+        try
+        {
+            if (!System.IO.File.Exists(MnistSettingsPath))
+                return;
+            var lines = await System.IO.File.ReadAllLinesAsync(MnistSettingsPath);
+            if (lines is not [var images, var labels, ..] || !System.IO.File.Exists(images) || !System.IO.File.Exists(labels))
+                return;
+            MnistTraining ??= await Task.Run(() => MnistReader.Read(images, labels));
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or System.IO.InvalidDataException or UnauthorizedAccessException)
+        {
+            // The files changed since; the user can load them again.
+        }
+    }
+
     public bool HasNetwork => Network is not null;
 
     public CharacterSet CharacterSet => Network is null ? CharacterSet.DigitsOnly : CharacterSet.FromLabels(Network.Labels);
@@ -127,6 +173,7 @@ public sealed partial class AppState : ObservableObject
         var cache = await GetGlyphCacheAsync();
         var set = CharacterSet;
         var options = DatasetOptions.Clone();
+        var mnist = MnistTraining;
         ulong seed = TrainingOptions.Seed;
         int threads = TrainingOptions.Threads;
 
@@ -142,7 +189,7 @@ public sealed partial class AppState : ObservableObject
                 }
             }
             status?.Report("Preparing dataset…");
-            return new GlyphDataset(set, faces, cache, options, UserSamples, seed);
+            return new GlyphDataset(set, faces, cache, options, UserSamples, seed, mnist);
         }, cancellationToken);
     }
 }
