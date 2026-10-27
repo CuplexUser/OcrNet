@@ -1,0 +1,145 @@
+<UserControl x:Class="OcrNet.App.Views.RecognizeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="True" KeyDown="OnKeyDown">
+    <Grid Margin="4,12,4,8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Style="{StaticResource Card}" VerticalAlignment="Top">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,10">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <RadioButton Content="One character" IsChecked="{Binding IsSingleMode, Mode=OneWay}" Checked="OnSingleMode" Margin="0,0,8,0" MinWidth="0" />
+                        <RadioButton Content="A line of text" IsChecked="{Binding LineMode}" MinWidth="0" />
+                    </StackPanel>
+                    <TextBlock Text="Draw here" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" Margin="0" />
+                </DockPanel>
+                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Background="#0A0D11" ClipToBounds="True">
+                    <InkCanvas x:Name="Canvas" Background="Transparent" Cursor="Pen"
+                               StrokeCollected="OnStrokesChanged" StrokeErased="OnStrokesChanged">
+                        <InkCanvas.Style>
+                            <Style TargetType="InkCanvas">
+                                <Setter Property="Width" Value="380" />
+                                <Setter Property="Height" Value="380" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding LineMode}" Value="True">
+                                        <Setter Property="Width" Value="780" />
+                                        <Setter Property="Height" Value="240" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </InkCanvas.Style>
+                    </InkCanvas>
+                </Border>
+                <DockPanel Margin="0,10,0,0">
+                    <Button DockPanel.Dock="Right" Content="Clear  (Esc)" Click="OnClear" />
+                    <TextBlock Text="Pen" Style="{StaticResource FieldLabel}" />
+                    <Slider Minimum="6" Maximum="40" Value="{Binding PenWidth}" Width="140" VerticalAlignment="Center" ValueChanged="OnPenWidthChanged" />
+                </DockPanel>
+                <TextBlock Text="{Binding Hint}" Style="{StaticResource Caption}" Margin="0,10,0,0" MaxWidth="380" HorizontalAlignment="Left" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Recognized" Style="{StaticResource SectionTitle}" />
+                        <!-- Single character: normalized input, big answer and top-5 probabilities -->
+                        <Grid Visibility="{Binding IsSingleMode, Converter={StaticResource BoolToVisibility}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,20,0">
+                                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Width="112" Height="112">
+                                    <Image Source="{Binding NormalizedImage}" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                </Border>
+                                <TextBlock Text="network input 28×28" Style="{StaticResource Caption}" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding Recognized}" FontSize="84" FontFamily="{StaticResource MonoFont}"
+                                       Foreground="{StaticResource HighlightBrush}" MinWidth="120" VerticalAlignment="Center" Margin="0,-10,24,0" />
+                            <ItemsControl Grid.Column="2" ItemsSource="{Binding TopPredictions}" VerticalAlignment="Center">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="44" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="64" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Label}" Style="{StaticResource Mono}" FontSize="16" />
+                                            <ProgressBar Grid.Column="1" Maximum="1" Value="{Binding Probability, Mode=OneWay}" Height="8" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Probability, StringFormat={}{0:P1}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                        <!-- Line mode: the segmented characters -->
+                        <StackPanel Visibility="{Binding LineMode, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding Recognized}" FontSize="48" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource HighlightBrush}" Margin="0,0,0,10" />
+                            <ItemsControl ItemsSource="{Binding Segments}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,0,10,10">
+                                            <Image Source="{Binding Image}" Width="56" Height="56" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                            <TextBlock HorizontalAlignment="Center" Style="{StaticResource Mono}">
+                                                <Run Text="{Binding Label, Mode=OneWay}" Foreground="{StaticResource TextBrush}" />
+                                                <Run Text="{Binding Confidence, Mode=OneWay, StringFormat={}{0:P0}}" Foreground="{StaticResource TextMutedBrush}" FontSize="10" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Style="{StaticResource Caption}" Text="Characters are separated where there is a vertical gap in the ink, so leave a little space between them." />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Teach – wrong answer? Save the drawing with the correct label" Style="{StaticResource SectionTitle}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox Text="{Binding TeachLabel, UpdateSourceTrigger=PropertyChanged}" Width="60" MaxLength="1" FontFamily="{StaticResource MonoFont}" FontSize="16" HorizontalContentAlignment="Center" />
+                            <Button Content="Save as training sample" Command="{Binding TeachCommand}" Margin="8,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding TeachStatus}" Style="{StaticResource Caption}" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Test with an installed font" Style="{StaticResource SectionTitle}" />
+                        <StackPanel Orientation="Horizontal">
+                            <ComboBox ItemsSource="{Binding FontFamilies}" SelectedItem="{Binding SelectedFontFamily}" Width="220" />
+                            <TextBox Text="{Binding FontTestText}" Width="240" Margin="8,0" />
+                            <Button Content="Classify" Command="{Binding TestFontCommand}" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding FontTestResults}" Margin="0,10,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,10,10" Width="64">
+                                        <Image Source="{Binding Image}" Width="48" Height="48" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                        <TextBlock Text="{Binding Label}" HorizontalAlignment="Center" Style="{StaticResource Mono}" FontSize="11" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

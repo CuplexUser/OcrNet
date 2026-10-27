@@ -1,0 +1,279 @@
+<UserControl x:Class="OcrNet.App.Views.TrainingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:OcrNet.App.Controls">
+    <UserControl.Resources>
+        <Style x:Key="Row" TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,7" />
+        </Style>
+        <Style x:Key="Tile" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="4,12,4,8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="370" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Hyperparameters -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="0,0,8,0" IsEnabled="{Binding CanStart}">
+            <StackPanel>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Optimization" Style="{StaticResource SectionTitle}" />
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Epochs" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.Epochs}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Batch size" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.BatchSize}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Learning rate" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.LearningRate}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Optimizer" Style="{StaticResource FieldLabel}" />
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding Optimizers}" SelectedItem="{Binding Options.Optimizer}" HorizontalAlignment="Stretch" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Weight decay (L2)" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.WeightDecay}" Style="{StaticResource NumberBox}"
+                                     ToolTip="L2 penalty for SGD/RMSProp/Adam; decoupled weight decay for AdamW. Not applied to biases." />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Dropout (all layers)" Style="{StaticResource FieldLabel}" />
+                            <CheckBox Grid.Column="1" IsChecked="{Binding DropoutOverrideEnabled}" MinWidth="0" ToolTip="Override the per-layer dropout set in the designer" />
+                            <TextBox Grid.Column="2" Text="{Binding DropoutOverride}" Style="{StaticResource NumberBox}" IsEnabled="{Binding DropoutOverrideEnabled}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Label smoothing" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.LabelSmoothing}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Gradient clip norm" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.GradientClipNorm}" Style="{StaticResource NumberBox}" ToolTip="0 = off" />
+                        </Grid>
+                        <TextBlock Text="Optimizer details" Style="{StaticResource SectionTitle}" Margin="0,10,0,10" />
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="SGD momentum" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.Momentum}" Style="{StaticResource NumberBox}" />
+                            <CheckBox Grid.Column="2" Content="Nesterov" IsChecked="{Binding Options.Nesterov}" Margin="10,0,0,0" MinWidth="0" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Adam β₁ / β₂" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.Beta1}" Style="{StaticResource NumberBox}" MinWidth="0" />
+                            <TextBox Grid.Column="3" Text="{Binding Options.Beta2}" Style="{StaticResource NumberBox}" MinWidth="0" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="RMSProp ρ" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.RmsPropRho}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Learning-rate schedule" Style="{StaticResource SectionTitle}" />
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Schedule" Style="{StaticResource FieldLabel}" />
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding Schedules}" SelectedItem="{Binding Options.Schedule}" HorizontalAlignment="Stretch" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Warm-up epochs" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.WarmupEpochs}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Step every (epochs)" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.StepEpochs}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Decay factor γ" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.Gamma}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Cosine final factor" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.MinLearningRateFactor}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Run" Style="{StaticResource SectionTitle}" />
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Early-stop patience" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.EarlyStoppingPatience}" Style="{StaticResource NumberBox}" ToolTip="Epochs without validation improvement; 0 = off" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Threads" Style="{StaticResource FieldLabel}" />
+                            <Slider Grid.Column="1" Minimum="1" Maximum="{Binding MaxThreads}" Value="{Binding Options.Threads}" IsSnapToTickEnabled="True" TickFrequency="1" />
+                            <TextBlock Grid.Column="2" Text="{Binding Options.Threads}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Seed" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" Text="{Binding Options.Seed}" Style="{StaticResource NumberBox}" />
+                        </Grid>
+                        <CheckBox Content="Keep weights of the best validation epoch" IsChecked="{Binding Options.RestoreBestWeights}" Margin="0,4,0,4" />
+                        <CheckBox Content="Save optimizer state with the model" IsChecked="{Binding SaveOptimizerState}"
+                                  ToolTip="Larger file, but “Continue training” picks up exactly where it stopped" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Dashboard -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="230" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                            <Button Content="Train from scratch" Command="{Binding StartCommand}" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,0" Padding="14,8" />
+                            <Button Content="Continue training" Command="{Binding ContinueCommand}" Margin="0,0,8,0" Padding="14,8" />
+                            <Button Command="{Binding PauseCommand}" Margin="0,0,8,0" Padding="14,8">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                        <Setter Property="Content" Value="Pause" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                <Setter Property="Content" Value="Resume" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Content="Stop" Command="{Binding StopCommand}" Padding="14,8" />
+                        </StackPanel>
+                        <Button DockPanel.Dock="Right" Content="Evaluate on MNIST…" Command="{Binding EvaluateMnistCommand}" HorizontalAlignment="Right"
+                                ToolTip="Measure accuracy on real handwritten digits (MNIST IDX files, not included)" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding Phase}" Margin="0,12,0,6" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="70" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                        <TextBlock Text="epoch" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                        <ProgressBar Grid.Column="1" Maximum="1" Value="{Binding EpochProgress, Mode=OneWay}" Height="6" Margin="0,4" />
+                        <TextBlock Grid.Row="1" Text="run" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                        <ProgressBar Grid.Row="1" Grid.Column="1" Maximum="1" Value="{Binding OverallProgress, Mode=OneWay}" Height="6" Margin="0,4" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <UniformGrid Grid.Row="1" Rows="1" Margin="0,0,-8,12">
+                <Border Style="{StaticResource Tile}"><StackPanel><TextBlock Text="EPOCH" Style="{StaticResource MetricLabel}" /><TextBlock Text="{Binding EpochText}" Style="{StaticResource Metric}" /></StackPanel></Border>
+                <Border Style="{StaticResource Tile}"><StackPanel><TextBlock Text="TRAIN LOSS" Style="{StaticResource MetricLabel}" /><TextBlock Text="{Binding LossText}" Style="{StaticResource Metric}" /></StackPanel></Border>
+                <Border Style="{StaticResource Tile}"><StackPanel><TextBlock Text="TRAIN ACCURACY" Style="{StaticResource MetricLabel}" /><TextBlock Text="{Binding AccuracyText}" Style="{StaticResource Metric}" Foreground="{StaticResource SignalBrush}" /></StackPanel></Border>
+                <Border Style="{StaticResource Tile}"><StackPanel><TextBlock Text="VALIDATION (UNSEEN FONTS)" Style="{StaticResource MetricLabel}" /><TextBlock Text="{Binding ValidationText}" Style="{StaticResource Metric}" Foreground="{StaticResource ValidationBrush}" /></StackPanel></Border>
+                <Border Style="{StaticResource Tile}"><StackPanel><TextBlock Text="LEARNING RATE" Style="{StaticResource MetricLabel}" /><TextBlock Text="{Binding LearningRateText}" Style="{StaticResource Metric}" /></StackPanel></Border>
+                <Border Style="{StaticResource Tile}"><StackPanel><TextBlock Text="SPEED" Style="{StaticResource MetricLabel}" /><TextBlock Text="{Binding SpeedText}" Style="{StaticResource Metric}" /></StackPanel></Border>
+                <Border Style="{StaticResource Tile}"><StackPanel><TextBlock Text="TIME" Style="{StaticResource MetricLabel}" /><TextBlock Text="{Binding TimeText}" Style="{StaticResource Metric}" /><TextBlock Text="{Binding RemainingText}" Style="{StaticResource Caption}" FontSize="11" /></StackPanel></Border>
+            </UniformGrid>
+
+            <Grid Grid.Row="2" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="0.7*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource Card}" Margin="0">
+                    <controls:LineChart Title="Loss" Series="{Binding LossSeries}" YFormat="0.00" />
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0">
+                    <controls:LineChart Title="Accuracy %" Series="{Binding AccuracySeries}" YFormat="0.#" />
+                </Border>
+                <Border Grid.Column="4" Style="{StaticResource Card}" Margin="0">
+                    <controls:LineChart Title="Learning rate" Series="{Binding LearningRateSeries}" YFormat="0.#####" YMin="0" />
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource Card}" Margin="0">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Validation confusion matrix" Style="{StaticResource SectionTitle}" />
+                        <controls:ConfusionMatrixControl Matrix="{Binding Confusion}" Labels="{Binding ConfusionLabels}" />
+                    </DockPanel>
+                </Border>
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Style="{StaticResource Card}" Margin="0">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Most confident mistakes (expected → predicted)" Style="{StaticResource SectionTitle}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Worst}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,8,8" Width="64">
+                                                <Image Source="{Binding Image}" Width="48" Height="48" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                                <TextBlock Text="{Binding Text}" Style="{StaticResource Mono}" FontSize="10" HorizontalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+                    <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Log" Style="{StaticResource SectionTitle}" />
+                            <ListBox ItemsSource="{Binding Log}" Background="Transparent" BorderThickness="0" FontFamily="{StaticResource MonoFont}" FontSize="11"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

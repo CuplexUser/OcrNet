@@ -1,0 +1,185 @@
+<UserControl x:Class="OcrNet.App.Views.DatasetView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <!-- Label · slider · value -->
+        <Style x:Key="SliderRow" TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="4,12,4,8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="420" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Text="Training fonts" Style="{StaticResource SectionTitle}" />
+                    <TextBlock Text="{Binding FontSummary}" Style="{StaticResource Caption}" Margin="0,0,0,10" />
+                    <WrapPanel Margin="0,0,0,8">
+                        <CheckBox Content="Regular" IsChecked="{Binding UseRegular}" Margin="0,0,12,0" />
+                        <CheckBox Content="Bold" IsChecked="{Binding UseBold}" Margin="0,0,12,0" />
+                        <CheckBox Content="Italic" IsChecked="{Binding UseItalic}" Margin="0,0,12,0" />
+                        <CheckBox Content="Bold italic" IsChecked="{Binding UseBoldItalic}" />
+                    </WrapPanel>
+                    <TextBox Text="{Binding FontFilter, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"
+                             ToolTip="Filter fonts by name" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Content="All" Command="{Binding SelectAllCommand}" Margin="0,0,6,0" />
+                        <Button Content="None" Command="{Binding SelectNoneCommand}" Margin="0,0,6,0" />
+                        <Button Content="Defaults" Command="{Binding SelectDefaultsCommand}" ToolTip="Everything except decorative fonts" />
+                    </StackPanel>
+                </StackPanel>
+                <ListBox ItemsSource="{Binding FontsView}" VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected}" Padding="8,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Family}" />
+                                    <TextBlock Text="Aa Gg Rr 0123 4567 89" FontFamily="{Binding Family}" FontSize="17" Foreground="{StaticResource SignalBrush}" />
+                                    <TextBlock Text="{Binding Notes}" Style="{StaticResource Caption}" FontSize="11" />
+                                </StackPanel>
+                            </CheckBox>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Augmentation (make glyphs look handwritten)" Style="{StaticResource SectionTitle}" />
+                            <CheckBox Content="Enable augmentation" IsChecked="{Binding Augmentation.Enabled}" Margin="0,0,0,8" />
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Rotation ±°" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="30" Value="{Binding Augmentation.MaxRotationDegrees}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.MaxRotationDegrees, StringFormat={}{0:0}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Slant (shear) ±" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="0.6" Value="{Binding Augmentation.MaxShear}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.MaxShear, StringFormat={}{0:0.00}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Min scale" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0.5" Maximum="1" Value="{Binding Augmentation.MinScale}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.MinScale, StringFormat={}{0:0.00}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Max scale" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="1" Maximum="1.3" Value="{Binding Augmentation.MaxScale}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.MaxScale, StringFormat={}{0:0.00}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Aspect change ±" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="0.4" Value="{Binding Augmentation.MaxAspectChange}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.MaxAspectChange, StringFormat={}{0:0.00}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Elastic chance" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Augmentation.ElasticProbability}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.ElasticProbability, StringFormat={}{0:P0}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Elastic strength" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="6" Value="{Binding Augmentation.ElasticStrength}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.ElasticStrength, StringFormat={}{0:0.0}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Stroke width chance" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Augmentation.StrokeProbability}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.StrokeProbability, StringFormat={}{0:P0}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Pixel noise σ" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="0.1" Value="{Binding Augmentation.Noise}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Augmentation.Noise, StringFormat={}{0:0.000}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Sampling" Style="{StaticResource SectionTitle}" />
+                            <Grid Style="{StaticResource FormRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Samples per class per epoch" Style="{StaticResource FieldLabel}" />
+                                <TextBox Grid.Column="1" Text="{Binding Options.SamplesPerClass}" Style="{StaticResource NumberBox}" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Held-out font families" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0.05" Maximum="0.4" Value="{Binding Options.ValidationFontFraction}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Options.ValidationFontFraction, StringFormat={}{0:P0}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Style="{StaticResource SliderRow}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Use my drawings (chance)" Style="{StaticResource FieldLabel}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="0.8" Value="{Binding Options.UserSampleProbability}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Options.UserSampleProbability, StringFormat={}{0:P0}}" Style="{StaticResource Mono}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0"
+                                       Text="Validation always uses font families the network never sees during training, so its accuracy measures generalization to new letterforms." />
+
+                            <TextBlock Text="Your handwriting" Style="{StaticResource SectionTitle}" Margin="0,18,0,8" />
+                            <TextBlock Text="{Binding UserSampleSummary}" Style="{StaticResource Caption}" />
+                            <Button Content="Delete my drawings" Command="{Binding ClearUserSamplesCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <Button DockPanel.Dock="Right" Content="Generate preview" Command="{Binding RefreshPreviewCommand}" Style="{DynamicResource AccentButtonStyle}" />
+                            <TextBlock Text="Training samples as the network sees them (28×28, after augmentation and normalization)"
+                                       Style="{StaticResource SectionTitle}" VerticalAlignment="Center" Margin="0" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding PreviewStatus}" Style="{StaticResource Caption}" Margin="0,0,0,8" />
+                        <ItemsControl ItemsSource="{Binding PreviewSamples}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,8,8">
+                                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                            <Image Source="{Binding Image}" Width="64" Height="64" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                        </Border>
+                                        <TextBlock Text="{Binding Label}" HorizontalAlignment="Center" Style="{StaticResource Mono}" Foreground="{StaticResource TextMutedBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
