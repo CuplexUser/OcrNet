@@ -10,7 +10,7 @@ namespace OcrNet.App.Services;
 /// <summary>
 /// Developer smoke test: <c>OcrNet.App.exe --snapshot &lt;folder&gt; [--train] [--draw &lt;text&gt;] [--font-test &lt;text&gt;]</c>
 /// optionally trains the default network briefly, draws a sample, runs the font test, renders every
-/// tab offscreen to PNG files, checks that Esc clears the canvas (checks.txt) and exits. Works without an interactive desktop (e.g. a locked session or CI).
+/// tab offscreen to PNG files, checks that Esc clears the canvas (checks.txt), captures line mode at the minimum width and exits. Works without an interactive desktop (e.g. a locked session or CI).
 /// </summary>
 public static class SnapshotRunner
 {
@@ -51,7 +51,20 @@ public static class SnapshotRunner
         }
 
         if (recognize is not null && drawText is not null)
+        {
             await CheckEscapeClearsCanvasAsync(window, vm, recognize, drawText, Path.Combine(folder, "checks.txt"));
+
+            // Line mode at the narrowest window size, where the layout is tightest.
+            window.WindowState = WindowState.Normal;
+            window.Width = window.MinWidth;
+            vm.Recognize.LineMode = true;
+            await Idle();
+            recognize.DrawText(drawText);
+            await Idle();
+            await Task.Delay(400);
+            await Idle();
+            Save(window, Path.Combine(folder, "tab4-line-narrow.png"));
+        }
 
         var dialog = new Views.MessageDialog("The current network has unsaved training. Replace it with a new, untrained network?",
             "OcrNet", MessageBoxButton.YesNoCancel, MessageBoxImage.Question) { Owner = window, ShowActivated = false };
@@ -65,25 +78,47 @@ public static class SnapshotRunner
     }
 
     /// <summary>
-    /// Sends Esc from outside the Recognize view (the tab strip), the way it arrives after drawing
-    /// with the mouse, and records whether the canvas was cleared.
+    /// Sends Esc from outside the Recognize view (the tab strip) and from the canvas itself, the way
+    /// it arrives after drawing with the mouse, and records whether the canvas was cleared each time.
     /// </summary>
     private static async Task CheckEscapeClearsCanvasAsync(Window window, MainViewModel vm, Views.RecognizeView recognize, string drawText, string path)
     {
         vm.SelectedTab = 3;
         await Idle();
-        recognize.DrawText(drawText);
-        await Idle();
-        int before = recognize.StrokeCount;
-        var tabs = FindDescendant<System.Windows.Controls.TabControl>(window)!;
-        tabs.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
-            PresentationSource.FromVisual(window)!, 0, System.Windows.Input.Key.Escape)
+        var lines = new List<string>();
+        var sources = new (string Name, UIElement Element)[]
+        {
+            ("tab strip", FindDescendant<System.Windows.Controls.TabControl>(window)!),
+            ("canvas", recognize.Canvas),
+        };
+        foreach (var (name, element) in sources)
+        {
+            recognize.DrawText(drawText);
+            await Idle();
+            int before = recognize.StrokeCount;
+            PressKey(window, element, System.Windows.Input.Key.Escape);
+            await Idle();
+            int after = recognize.StrokeCount;
+            lines.Add($"Esc from {name} clears canvas: {(before > 0 && after == 0 ? "PASS" : "FAIL")} (strokes {before} -> {after})");
+        }
+        File.WriteAllLines(path, lines);
+    }
+
+    /// <summary>Raises PreviewKeyDown then (unless handled) KeyDown on <paramref name="target"/>, like a real key press.</summary>
+    private static void PressKey(Window window, UIElement target, System.Windows.Input.Key key)
+    {
+        var source = PresentationSource.FromVisual(window)!;
+        var preview = new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, source, 0, key)
+        {
+            RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent,
+        };
+        target.RaiseEvent(preview);
+        if (preview.Handled)
+            return;
+        target.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, source, 0, key)
         {
             RoutedEvent = System.Windows.Input.Keyboard.KeyDownEvent,
         });
-        await Idle();
-        int after = recognize.StrokeCount;
-        File.WriteAllText(path, $"Esc clears canvas: {(before > 0 && after == 0 ? "PASS" : "FAIL")} (strokes {before} -> {after}){Environment.NewLine}");
     }
 
     private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject

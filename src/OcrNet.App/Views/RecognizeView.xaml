@@ -7,8 +7,25 @@
             <ColumnDefinition Width="16" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <Border Grid.Column="0" Style="{StaticResource Card}" VerticalAlignment="Top">
+        <!-- One character: drawing on the left, results on the right. A line of text needs the wide
+             canvas, so the drawing goes on top and the results below it, using the full width. -->
+        <Border VerticalAlignment="Top" HorizontalAlignment="Left">
+            <Border.Style>
+                <Style TargetType="Border" BasedOn="{StaticResource Card}">
+                    <Setter Property="Grid.RowSpan" Value="2" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding LineMode}" Value="True">
+                            <Setter Property="Grid.RowSpan" Value="1" />
+                            <Setter Property="Grid.ColumnSpan" Value="3" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <StackPanel>
                 <DockPanel Margin="0,0,0,10">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -37,12 +54,27 @@
                     <Button DockPanel.Dock="Right" Content="Clear  (Esc)" Click="OnClear" />
                     <TextBlock Text="Pen" Style="{StaticResource FieldLabel}" />
                     <Slider Minimum="6" Maximum="40" Value="{Binding PenWidth}" Width="140" VerticalAlignment="Center" ValueChanged="OnPenWidthChanged" />
+                    <TextBlock Text="Right-drag erases" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="12,0" />
                 </DockPanel>
-                <TextBlock Text="{Binding Hint}" Style="{StaticResource Caption}" Margin="0,10,0,0" MaxWidth="380" HorizontalAlignment="Left" />
+                <TextBlock Text="{Binding Hint}" Style="{StaticResource Caption}" Margin="0,10,0,0" MaxWidth="{Binding ActualWidth, ElementName=Canvas}" HorizontalAlignment="Left" />
             </StackPanel>
         </Border>
 
-        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer.Style>
+                <Style TargetType="ScrollViewer">
+                    <Setter Property="Grid.Column" Value="2" />
+                    <Setter Property="Grid.RowSpan" Value="2" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding LineMode}" Value="True">
+                            <Setter Property="Grid.Column" Value="0" />
+                            <Setter Property="Grid.ColumnSpan" Value="3" />
+                            <Setter Property="Grid.Row" Value="1" />
+                            <Setter Property="Grid.RowSpan" Value="1" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Style>
             <StackPanel>
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
@@ -105,9 +137,38 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="Teach – wrong answer? Save the drawing with the correct label" Style="{StaticResource SectionTitle}" />
+                        <TextBlock TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}">
+                                    <Setter Property="Text" Value="Teach – wrong answer? Save the drawing with the correct label" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LineMode}" Value="True">
+                                            <Setter Property="Text" Value="Teach – wrong answer? Type the whole line correctly, one character per box above" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                         <StackPanel Orientation="Horizontal">
-                            <TextBox Text="{Binding TeachLabel, UpdateSourceTrigger=PropertyChanged}" Width="60" MaxLength="1" FontFamily="{StaticResource MonoFont}" FontSize="16" HorizontalContentAlignment="Center" />
+                            <TextBox Text="{Binding TeachLabel, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" FontSize="16">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                        <Setter Property="Width" Value="60" />
+                                        <Setter Property="MaxLength" Value="1" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding LineMode}" Value="True">
+                                                <Setter Property="Width" Value="260" />
+                                                <Setter Property="MaxLength" Value="0" />
+                                                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding TeachCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
                             <Button Content="Save as training sample" Command="{Binding TeachCommand}" Margin="8,0,0,0" />
                         </StackPanel>
                         <TextBlock Text="{Binding TeachStatus}" Style="{StaticResource Caption}" Margin="0,8,0,0" />
@@ -117,17 +178,23 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <TextBlock Text="Test with an installed font" Style="{StaticResource SectionTitle}" />
-                        <StackPanel Orientation="Horizontal">
-                            <ComboBox ItemsSource="{Binding FontFamilies}" SelectedItem="{Binding SelectedFontFamily}" Width="220" />
-                            <TextBox Text="{Binding FontTestText, UpdateSourceTrigger=PropertyChanged}" Width="240" Margin="8,0">
+                        <!-- Wraps instead of clipping when the window is narrow. -->
+                        <WrapPanel Margin="0,0,0,-8">
+                            <ComboBox ItemsSource="{Binding FontFamilies}" SelectedItem="{Binding SelectedFontFamily}" Width="220" Margin="0,0,8,8" />
+                            <TextBox Text="{Binding FontTestText, UpdateSourceTrigger=PropertyChanged}" Width="240" Margin="0,0,8,8">
                                 <TextBox.InputBindings>
                                     <KeyBinding Key="Enter" Command="{Binding TestFontCommand}" />
                                 </TextBox.InputBindings>
                             </TextBox>
-                            <Button Content="Classify" Command="{Binding TestFontCommand}" />
-                            <CheckBox Content="Only mistakes" IsChecked="{Binding ShowOnlyMistakes}" Margin="16,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
+                            <Button Content="Classify" Command="{Binding TestFontCommand}" Margin="0,0,16,8" />
+                            <CheckBox Content="Only mistakes" IsChecked="{Binding ShowOnlyMistakes}" Margin="0,0,0,8" VerticalAlignment="Center" />
+                        </WrapPanel>
                         <TextBlock Text="{Binding FontTestSummary}" Style="{StaticResource Caption}" Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
+                        <DockPanel Margin="0,10,0,0">
+                            <Button DockPanel.Dock="Left" Content="Add mistakes to training data" Command="{Binding AddMistakesToTrainingCommand}" VerticalAlignment="Top"
+                                    ToolTip="Saves each misclassified glyph as a training sample; they are mixed into training the next time you train" />
+                            <TextBlock Text="{Binding FontTrainStatus}" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                        </DockPanel>
                         <ItemsControl ItemsSource="{Binding FontTestResults}" Margin="0,10,0,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
