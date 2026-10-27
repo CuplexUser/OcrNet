@@ -13,6 +13,17 @@ public sealed record Prediction(string Label, double Probability, bool IsTop);
 
 public sealed record SegmentResult(BitmapSource Image, string Label, double Confidence);
 
+public enum FontTestOutcome
+{
+    Correct,
+    Wrong,
+
+    /// <summary>The character is not one of the network's classes, so no answer can be right.</summary>
+    NotAClass,
+}
+
+public sealed record FontTestResult(BitmapSource Image, string Expected, string Predicted, double Confidence, FontTestOutcome Outcome, string Details);
+
 /// <summary>Classifies drawings from the ink canvas (one character, or a line split into characters).</summary>
 public sealed partial class RecognizeViewModel : ObservableObject
 {
@@ -33,7 +44,16 @@ public sealed partial class RecognizeViewModel : ObservableObject
 
     public ObservableCollection<string> FontFamilies { get; } = [];
 
-    public ObservableCollection<SegmentResult> FontTestResults { get; } = [];
+    /// <summary>The font test results currently shown (all, or only the mistakes).</summary>
+    public ObservableCollection<FontTestResult> FontTestResults { get; } = [];
+
+    private readonly List<FontTestResult> _fontTestResults = [];
+
+    [ObservableProperty]
+    public partial string FontTestSummary { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool ShowOnlyMistakes { get; set; }
 
     [ObservableProperty]
     public partial double PenWidth { get; set; } = 18;
@@ -60,7 +80,7 @@ public sealed partial class RecognizeViewModel : ObservableObject
     public partial string? SelectedFontFamily { get; set; }
 
     [ObservableProperty]
-    public partial string FontTestText { get; set; } = "0123456789 OcrNet";
+    public partial string FontTestText { get; set; } = "0123456789 OcrNet Räksmörgås";
 
     public string Hint => _state.HasNetwork
         ? $"Draw a character. The network knows: {string.Join(" ", _state.CharacterSet.Classes.Select(CharacterSet.Display))}"
@@ -159,7 +179,9 @@ public sealed partial class RecognizeViewModel : ObservableObject
     [RelayCommand]
     private void TestFont()
     {
+        _fontTestResults.Clear();
         FontTestResults.Clear();
+        FontTestSummary = "";
         if (_state.Network is not { } network || SelectedFontFamily is null)
             return;
         var face = new FontFace(SelectedFontFamily, FontVariant.Regular, false, true, true, false);
@@ -168,17 +190,59 @@ public sealed partial class RecognizeViewModel : ObservableObject
         // Render each distinct character once; repeated characters ("sss") reuse the same glyph.
         var glyphs = GlyphRenderer.RenderFace(face, string.Concat(FontTestText.Distinct()))
             .ToDictionary(g => g.Character, g => g.Image);
+        var missingGlyphs = new List<char>();
         foreach (char c in FontTestText.Where(c => !char.IsWhiteSpace(c)))
         {
             if (!glyphs.TryGetValue(c, out var image))
+            {
+                if (!missingGlyphs.Contains(c))
+                    missingGlyphs.Add(c);
                 continue;
+            }
             var input = Normalizer.Normalize(image, normalizer);
             var probabilities = network.Predict(input);
-            int best = Array.IndexOf(probabilities, probabilities.Max());
-            string predicted = CharacterSet.Display(network.Labels[best]);
-            bool correct = network.Labels[best].Contains(c);
-            FontTestResults.Add(new SegmentResult(BitmapFactory.Grayscale(input, size, size),
-                $"{c} → {predicted}{(correct ? "" : "  ✗")}", probabilities[best]));
+            var ranked = Enumerable.Range(0, probabilities.Length).OrderByDescending(i => probabilities[i]).Take(3).ToArray();
+            int best = ranked[0];
+            var outcome = !network.Labels.Any(l => l.Contains(c)) ? FontTestOutcome.NotAClass
+                : network.Labels[best].Contains(c) ? FontTestOutcome.Correct
+                : FontTestOutcome.Wrong;
+            string details = outcome == FontTestOutcome.NotAClass
+                ? $"'{c}' is not one of this network's classes, so it cannot be recognized."
+                : "Top guesses: " + string.Join(" · ", ranked.Select(i => $"{CharacterSet.Display(network.Labels[i])} {probabilities[i]:P0}"));
+            _fontTestResults.Add(new FontTestResult(BitmapFactory.Grayscale(input, size, size), c.ToString(),
+                CharacterSet.Display(network.Labels[best]), probabilities[best], outcome, details));
         }
+        FontTestSummary = SummarizeFontTest(missingGlyphs);
+        ShowFontTestResults();
+    }
+
+    partial void OnShowOnlyMistakesChanged(bool value) => ShowFontTestResults();
+
+    private void ShowFontTestResults()
+    {
+        FontTestResults.Clear();
+        foreach (var result in _fontTestResults.Where(r => !ShowOnlyMistakes || r.Outcome == FontTestOutcome.Wrong))
+            FontTestResults.Add(result);
+    }
+
+    private string SummarizeFontTest(List<char> missingGlyphs)
+    {
+        var known = _fontTestResults.Where(r => r.Outcome != FontTestOutcome.NotAClass).ToList();
+        var parts = new List<string>();
+        if (known.Count > 0)
+        {
+            int correct = known.Count(r => r.Outcome == FontTestOutcome.Correct);
+            parts.Add($"{correct} of {known.Count} correct ({(double)correct / known.Count:P0})");
+        }
+        var wrong = _fontTestResults.Where(r => r.Outcome == FontTestOutcome.Wrong)
+            .Select(r => $"{r.Expected}→{r.Predicted}").Distinct().ToList();
+        if (wrong.Count > 0)
+            parts.Add("mistakes: " + string.Join(", ", wrong));
+        var notClasses = _fontTestResults.Where(r => r.Outcome == FontTestOutcome.NotAClass).Select(r => r.Expected).Distinct().ToList();
+        if (notClasses.Count > 0)
+            parts.Add("not classes of this network: " + string.Join(" ", notClasses));
+        if (missingGlyphs.Count > 0)
+            parts.Add("not in this font: " + string.Join(" ", missingGlyphs));
+        return string.Join("  ·  ", parts);
     }
 }

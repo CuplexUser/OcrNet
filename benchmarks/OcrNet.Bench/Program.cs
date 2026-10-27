@@ -7,8 +7,9 @@ using OcrNet.Core.Training;
 using OcrNet.Data.Datasets;
 using OcrNet.Data.Glyphs;
 
-// Usage: OcrNet.Bench [gemm] [mlp] [digits] [balanced] [alnum]   (default: gemm mlp)
+// Usage: OcrNet.Bench [gemm] [mlp] [pipeline] [fonts] [digits] [balanced] [alnum] [swedish]   (default: gemm mlp)
 var modes = args.Length > 0 ? args : ["gemm", "mlp"];
+Console.OutputEncoding = System.Text.Encoding.UTF8;
 Console.WriteLine($"CPU threads: {Environment.ProcessorCount}, AVX2: {System.Runtime.Intrinsics.X86.Avx2.IsSupported}, FMA: {System.Runtime.Intrinsics.X86.Fma.IsSupported}");
 
 if (modes.Contains("gemm"))
@@ -26,6 +27,8 @@ if (modes.Contains("balanced"))
     BenchFonts(CharacterSet.Balanced, [512, 256], epochs: 15, samplesPerClass: 1200);
 if (modes.Contains("alnum"))
     BenchFonts(CharacterSet.Alphanumeric, [512, 256], epochs: 15, samplesPerClass: 1200);
+if (modes.Contains("swedish"))
+    BenchFonts(CharacterSet.Create(CharacterSetKind.Balanced, swedish: true, symbols: true), [768, 384], epochs: 15, samplesPerClass: 1200);
 
 static void BenchPipeline()
 {

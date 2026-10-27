@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="clr-namespace:OcrNet.App.Controls">
 
     <!-- Palette: a dark "instrument panel" with a teal signal color for positive weights/activations,
          coral for negative weights and violet for validation series. -->
@@ -28,6 +29,7 @@
     <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, Courier New</FontFamily>
 
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    <controls:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
 
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />

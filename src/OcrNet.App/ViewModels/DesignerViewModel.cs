@@ -63,7 +63,9 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     public IReadOnlyList<Preset> Presets => Preset.All;
 
-    public IReadOnlyList<string> CharacterSetNames { get; } = [.. CharacterSet.Presets.Select(p => p.Name), CustomSetName];
+    /// <summary>The base coverage choices, plus "Custom…"; Swedish letters and symbols are toggled separately.</summary>
+    public IReadOnlyList<string> CharacterSetNames { get; } =
+        [.. Enum.GetValues<CharacterSetKind>().Select(CharacterSet.KindName), CustomSetName];
 
     public IReadOnlyList<ActivationKind> Activations { get; } = Enum.GetValues<ActivationKind>();
 
@@ -81,8 +83,14 @@ public sealed partial class DesignerViewModel : ObservableObject
     public partial string Description { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsCustomSet))]
-    public partial string SelectedCharacterSetName { get; set; } = CharacterSet.DigitsOnly.Name;
+    [NotifyPropertyChangedFor(nameof(IsCustomSet), nameof(CanIncludeSwedish))]
+    public partial string SelectedCharacterSetName { get; set; } = CharacterSet.KindName(CharacterSetKind.Digits);
+
+    [ObservableProperty]
+    public partial bool IncludeSwedish { get; set; }
+
+    [ObservableProperty]
+    public partial bool IncludeSymbols { get; set; }
 
     [ObservableProperty]
     public partial string CustomCharacters { get; set; } = "0123456789+-=";
@@ -116,9 +124,32 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     public bool IsCustomSet => SelectedCharacterSetName == CustomSetName;
 
-    public CharacterSet CurrentCharacterSet => IsCustomSet
-        ? CharacterSet.Custom(CustomCharacters)
-        : CharacterSet.Presets.First(p => p.Name == SelectedCharacterSetName);
+    /// <summary>Digits have no letters to add Å, Ä and Ö to.</summary>
+    public bool CanIncludeSwedish => !IsCustomSet && SelectedKind != CharacterSetKind.Digits;
+
+    private CharacterSetKind? SelectedKind => Enum.GetValues<CharacterSetKind>()
+        .Cast<CharacterSetKind?>()
+        .FirstOrDefault(k => CharacterSet.KindName(k!.Value) == SelectedCharacterSetName);
+
+    public CharacterSet CurrentCharacterSet => SelectedKind is { } kind
+        ? CharacterSet.Create(kind, IncludeSwedish, IncludeSymbols)
+        : CharacterSet.Custom(CustomCharacters);
+
+    /// <summary>Shows <paramref name="set"/> in the class selection (base coverage, extras, or custom characters).</summary>
+    private void SelectCharacterSet(CharacterSet set)
+    {
+        if (set.Kind is { } kind)
+        {
+            SelectedCharacterSetName = CharacterSet.KindName(kind);
+            IncludeSwedish = set.HasSwedish;
+            IncludeSymbols = set.HasSymbols;
+        }
+        else
+        {
+            SelectedCharacterSetName = CustomSetName;
+            CustomCharacters = set.Characters;
+        }
+    }
 
     partial void OnSelectedPresetChanged(Preset? value)
     {
@@ -130,6 +161,10 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     partial void OnCustomCharactersChanged(string value) => UpdatePreview();
 
+    partial void OnIncludeSwedishChanged(bool value) => UpdatePreview();
+
+    partial void OnIncludeSymbolsChanged(bool value) => UpdatePreview();
+
     partial void OnWeightInitChanged(WeightInitKind value) => UpdatePreview();
 
     partial void OnSeedChanged(ulong value) => UpdatePreview();
@@ -139,7 +174,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     private void ApplyPreset(Preset preset)
     {
         _loading = true;
-        SelectedCharacterSetName = preset.CharacterSet.Name;
+        SelectCharacterSet(preset.CharacterSet);
         ModelName = preset.Name.Split(' ')[0] + " model";
         Description = preset.Description;
         Layers.Clear();
@@ -247,16 +282,7 @@ public sealed partial class DesignerViewModel : ObservableObject
         _loading = true;
         ModelName = network.Metadata.Name;
         Description = network.Metadata.Description;
-        var set = CharacterSet.FromLabels(network.Labels);
-        if (set.Name == "Custom")
-        {
-            SelectedCharacterSetName = CustomSetName;
-            CustomCharacters = string.Concat(network.Labels);
-        }
-        else
-        {
-            SelectedCharacterSetName = set.Name;
-        }
+        SelectCharacterSet(CharacterSet.FromLabels(network.Labels));
         Layers.Clear();
         foreach (var spec in NetworkBuilder.DescribeHiddenLayers(network))
             Layers.Add(HiddenLayerItem.From(spec));

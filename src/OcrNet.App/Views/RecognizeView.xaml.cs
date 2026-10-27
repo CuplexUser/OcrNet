@@ -10,17 +10,35 @@ namespace OcrNet.App.Views;
 
 public partial class RecognizeView : UserControl
 {
+    private Window? _window;
+
     public RecognizeView()
     {
         InitializeComponent();
+        // StrokesChanged covers drawing, erasing and clearing. Subscribed once here: Loaded fires
+        // again every time the tab is reselected.
+        Canvas.Strokes.StrokesChanged += (_, _) => Recognize();
         Loaded += (_, _) =>
         {
             ApplyPen();
-            Canvas.Strokes.StrokesChanged += (_, _) => Recognize();
+            // Esc is handled at window level: drawing with the mouse does not move keyboard focus
+            // into this view, so a KeyDown handler here would rarely see the key.
+            _window = Window.GetWindow(this);
+            if (_window is not null)
+                _window.KeyDown += OnWindowKeyDown;
+        };
+        Unloaded += (_, _) =>
+        {
+            if (_window is not null)
+                _window.KeyDown -= OnWindowKeyDown;
+            _window = null;
         };
     }
 
     private RecognizeViewModel? ViewModel => DataContext as RecognizeViewModel;
+
+    /// <summary>Number of strokes on the canvas (used by the snapshot smoke test).</summary>
+    public int StrokeCount => Canvas.Strokes.Count;
 
     private void ApplyPen()
     {
@@ -46,8 +64,6 @@ public partial class RecognizeView : UserControl
         }
         vm.Recognize(InkRasterizer.Rasterize(Canvas.Strokes, Canvas.ActualWidth, Canvas.ActualHeight));
     }
-
-    private void OnStrokesChanged(object sender, RoutedEventArgs e) => Recognize();
 
     private void OnClear(object sender, RoutedEventArgs e) => Canvas.Strokes.Clear();
 
@@ -98,9 +114,10 @@ public partial class RecognizeView : UserControl
         Canvas.Strokes.Add(strokes);
     }
 
-    private void OnKeyDown(object sender, KeyEventArgs e)
+    private void OnWindowKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape)
+        // Bubbling event: an open drop-down that closes on Esc has already marked it handled.
+        if (e.Key == Key.Escape && !e.Handled && IsVisible)
         {
             Canvas.Strokes.Clear();
             e.Handled = true;

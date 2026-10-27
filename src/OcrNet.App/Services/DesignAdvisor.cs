@@ -23,8 +23,8 @@ public static class DesignAdvisor
     /// <summary>Characters that look alike as isolated glyphs; ambiguous whenever they are separate classes.</summary>
     private static readonly (char A, char B)[] LookAlikes =
     [
-        ('0', 'O'), ('1', 'I'), ('1', 'l'), ('I', 'l'), ('2', 'Z'), ('5', 'S'), ('8', 'B'),
-        .. CharacterSet.MergedLower.Select(c => (char.ToUpperInvariant(c), c)),
+        ('0', 'O'), ('1', 'I'), ('1', 'l'), ('I', 'l'), ('2', 'Z'), ('5', 'S'), ('8', 'B'), ('/', '1'), ('(', 'C'),
+        .. (CharacterSet.MergedLower + CharacterSet.SwedishLower).Select(c => (char.ToUpperInvariant(c), c)),
     ];
 
     /// <summary>A starting-point architecture for this many classes, with the reasoning.</summary>
@@ -133,7 +133,7 @@ public static class DesignAdvisor
         if (casePairs >= 5)
             warn($"This set keeps upper and lowercase look-alikes apart ({list}). As isolated glyphs they are often identical, " +
                  "so accuracy levels off around 85 % (measured with 62 classes) however large the network. The limit is in the " +
-                 "data, not the model. The Balanced (47) set merges these pairs.");
+                 "data, not the model. The Balanced sets merge these pairs.");
         else
             tip($"Look-alikes in this set: {list}. Isolated, they can be truly ambiguous, so they will dominate the confusion matrix " +
                 "and cap accuracy a little no matter how the network is designed.");

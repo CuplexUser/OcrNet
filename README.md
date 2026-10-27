@@ -70,16 +70,28 @@ The window has five tabs.
   | ------------------------- | ------: | ---------------------------------- | -----: |
   | Digits – fast             |      10 | 256, 128                           |      8 |
   | Balanced 47 – recommended |      47 | 512, 256                           |     15 |
+  | Swedish + symbols 68      |      68 | 768, 384                           |     15 |
   | Alphanumeric 62           |      62 | 512, 256                           |     15 |
   | Alphanumeric 62 – large   |      62 | 1024, 512, 256 with batch norm     |     20 |
 
-- **Output classes**:
-  - *Digits* (10).
-  - *Digits + uppercase* (36).
-  - *Balanced* (47). This is EMNIST-style: lowercase letters that look like their capitals
-    (`c i j k l m o p s u v w x y z`) are merged into one class with them.
-  - *Digits + upper + lower* (62).
-  - *Custom*: any set of characters, for example `0123456789+-=`.
+- **Output classes**: a base set plus two optional extras.
+  - Base sets:
+    - *Digits* (10).
+    - *Digits + uppercase* (36).
+    - *Balanced* (47). This is EMNIST-style: lowercase letters that look like their capitals
+      (`c i j k l m o p s u v w x y z`) are merged into one class with them.
+    - *Digits + upper + lower* (62).
+  - **Swedish letters** adds Å, Ä and Ö. In the Balanced set each is merged with its lowercase
+    form, because after normalization they differ only in size. In the other sets å, ä and ö get
+    classes of their own, and *Digits + uppercase* adds only the capitals.
+  - **Symbols** adds the 18 symbols `@ £ $ € % & / ( ) ? ; : ! + - = # *`. Punctuation that
+    differs only in size or position (`. , ' " _`) is left out on purpose: normalization scales
+    and centers every character, so a comma and an apostrophe would become identical.
+  - *Custom*: any set of characters, for example `0123456789+-=`. Characters outside the
+    pre-rendered range are rendered from the fonts the first time they're used.
+
+  Adding extras never reorders the classes of the base set: Swedish capitals come after Z,
+  Swedish lowercase after z, and symbols last.
 - **Hidden layers**: set the network depth and width. Each block is
   `Dense → [BatchNorm] → activation → Dropout`, and each block has its own unit count, activation
   (ReLU, LeakyReLU, Tanh, Sigmoid, GELU), dropout rate, and batch-norm toggle. You can add,
@@ -138,7 +150,14 @@ The window has five tabs.
 - **Line mode**: splits a drawn word into characters by vertical projection and recognizes each
   one.
 - **Teach**: saves the drawing with the correct label as a user sample.
-- **Font test**: renders text in a chosen font and runs it through the same pipeline.
+- **Font test**: renders text in a chosen font and runs it through the same pipeline (press Enter
+  or **Classify**).
+  - Mistakes are framed and tinted in coral, with the wrong guess in coral.
+  - Characters that aren't classes of the network are dimmed.
+  - A summary line gives the score and lists every mistake (for example `s→5`), which characters
+    aren't classes, and which ones the font lacks.
+  - **Only mistakes** hides the correct answers.
+  - Hovering a tile shows the network's top three guesses.
 
 ### 5. Visualize
 
@@ -241,9 +260,13 @@ build.ps1                        test + publish into dist\ (see Quick start)
 ### Data pipeline
 
 - **Glyph rendering.** `GlyphTypeface.GetGlyphOutline` geometry is drawn into a 64×64
-  `RenderTargetBitmap` on STA worker threads. Every printable ASCII character is rendered for every
-  face, so changing the character set doesn't require re-rendering. A face without lowercase
-  letters is skipped for lowercase classes.
+  `RenderTargetBitmap` on STA worker threads.
+  - Printable ASCII, Å Ä Ö å ä ö, £ and € are rendered for every face up front, so switching
+    between the built-in sets doesn't require re-rendering.
+  - The cache records which characters it has attempted for each face, so other characters (from a
+    custom set) are rendered on demand, once.
+  - A face without lowercase letters is skipped for lowercase classes, and a face that lacks a
+    glyph (an old font without €, say) is simply skipped for that class.
 - **Normalization** is shared by training and recognition, so drawings and font glyphs end up in
   the same space. It works like MNIST:
   1. Crop to the ink bounding box.
@@ -323,6 +346,7 @@ held-out font families that were never seen during training.
 | Digits (10) | 784-256-128-10 | 8 | 8 s | 98.1 % |
 | Balanced (47) | 784-512-256-47 | 15 | 42 s | 92.8 % |
 | Alphanumeric (62) | 784-512-256-62 | 15 | 59 s | 85.4 % |
+| Balanced + Swedish letters + symbols (68) | 784-768-384-68 | 15 | 100 s | 93.7 % |
 
 Notes:
 
@@ -331,7 +355,8 @@ Notes:
 - **Most remaining errors are inherent look-alikes.** The 47-class set mostly confuses `O`/`0` and
   `l`/`I`/`1`. The 62-class set also confuses the case of `c/C`, `o/O`, `s/S`, and similar pairs,
   which no single-character classifier can tell apart without context. That is why *Balanced 47*
-  is the recommended preset.
+  is the recommended preset. With Swedish letters and symbols added, the new confusions are `Ä`
+  versus `Å` (dots versus ring is a small detail at 28×28) and `l` versus `/` and `1`.
 - **Decorative fonts matter.** With script and display fonts included, digit accuracy dropped to
   about 92 %, because many of them draw digits in ways no one handwrites. That is why they are
   unselected by default.
@@ -355,12 +380,13 @@ The tests cover:
 - Model-file round trips (bit-identical predictions, optimizer state), detection of corrupt
   files, and rejection of files that aren't models.
 - Trainer convergence, determinism, and cancellation.
-- Normalizer translation and scale invariance, the segmenter, augmenter determinism, and the
-  character sets.
+- Normalizer translation and scale invariance, the segmenter, and augmenter determinism.
+- The character sets (sizes, merging, stable class order) and on-demand glyph rendering in the
+  cache.
 
 ```powershell
 dotnet run --project benchmarks/OcrNet.Bench -c Release -- gemm mlp pipeline
-dotnet run --project benchmarks/OcrNet.Bench -c Release -- digits balanced alnum
+dotnet run --project benchmarks/OcrNet.Bench -c Release -- digits balanced alnum swedish
 ```
 
 The modes are:
@@ -371,18 +397,26 @@ The modes are:
 | `mlp` | Training throughput on synthetic data |
 | `pipeline` | Augmentation throughput |
 | `fonts` | Font discovery and rendering |
-| `digits`, `balanced`, `alnum` | End-to-end training on fonts, reporting held-out-font accuracy |
+| `digits`, `balanced`, `alnum`, `swedish` | End-to-end training on fonts, reporting held-out-font accuracy |
 
 **Developer smoke test.** The app can render itself offscreen, which also works without an
 interactive desktop:
 
 ```powershell
-OcrNet.App.exe --snapshot <folder> [--train] [--draw <text>]
+OcrNet.App.exe --snapshot <folder> [--train] [--draw <text>] [--font-test <text>]
 ```
 
-It optionally trains the current network for 3 epochs, optionally draws `<text>` on the Recognize
-canvas, then saves every tab as a PNG (plus a full-height capture of tabs that scroll), a sample
-dialog as `dialog.png`, and `training-log.txt`, and exits.
+The run goes like this:
+
+1. **Optional steps.**
+   - `--train` trains the current network for 3 epochs.
+   - `--draw` draws `<text>` on the Recognize canvas.
+   - `--font-test` runs the font test with `<text>`.
+2. **Captures.** It saves every tab as a PNG (plus a full-height capture of tabs that scroll), a
+   sample dialog as `dialog.png`, and `training-log.txt`.
+3. **Esc check.** With `--draw`, it sends Esc from outside the Recognize view, the way the key
+   arrives after drawing with the mouse, and writes `PASS` or `FAIL` to `checks.txt`.
+4. It exits.
 
 ---
 

@@ -1,5 +1,7 @@
+using System.IO;
 using OcrNet.Core.Compute;
 using OcrNet.Data.Datasets;
+using OcrNet.Data.Glyphs;
 using OcrNet.Data.Imaging;
 
 namespace OcrNet.Core.Tests;
@@ -101,6 +103,79 @@ public class DataTests
         Assert.Equal(36, CharacterSet.DigitsAndUpper.Count);
         Assert.Equal(47, CharacterSet.Balanced.Count);
         Assert.Equal(62, CharacterSet.Alphanumeric.Count);
+    }
+
+    [Theory]
+    [InlineData(CharacterSetKind.Digits, false, true, 28)]
+    [InlineData(CharacterSetKind.DigitsAndUpper, true, false, 39)]
+    [InlineData(CharacterSetKind.Balanced, true, false, 50)]
+    [InlineData(CharacterSetKind.Balanced, true, true, 68)]
+    [InlineData(CharacterSetKind.Alphanumeric, true, false, 68)]
+    [InlineData(CharacterSetKind.Alphanumeric, true, true, 86)]
+    public void ComposedSets_HaveExpectedSizes(CharacterSetKind kind, bool swedish, bool symbols, int count)
+    {
+        var set = CharacterSet.Create(kind, swedish, symbols);
+        Assert.Equal(count, set.Count);
+        Assert.Equal(kind, set.Kind);
+        Assert.Equal(symbols, set.HasSymbols);
+    }
+
+    [Fact]
+    public void SwedishLetters_MergeOnlyInBalancedSets()
+    {
+        var balanced = CharacterSet.Create(CharacterSetKind.Balanced, swedish: true);
+        Assert.Equal(balanced.ClassOf('Å'), balanced.ClassOf('å'));
+        Assert.NotEqual(balanced.ClassOf('Ä'), balanced.ClassOf('A'));
+        var alphanumeric = CharacterSet.Create(CharacterSetKind.Alphanumeric, swedish: true);
+        Assert.NotEqual(alphanumeric.ClassOf('Ö'), alphanumeric.ClassOf('ö'));
+        Assert.Same(CharacterSet.DigitsOnly, CharacterSet.Create(CharacterSetKind.Digits, swedish: true));
+    }
+
+    [Fact]
+    public void BuiltInSets_KeepTheirOriginalClassOrder()
+    {
+        // Saved models store labels, so the classic sets must not change when extras are added.
+        Assert.Equal(CharacterSet.Digits + CharacterSet.Upper + CharacterSet.Lower, CharacterSet.Alphanumeric.Characters);
+        Assert.Equal(["0", "1"], CharacterSet.Balanced.Classes.Take(2));
+        Assert.Equal("Cc", CharacterSet.Balanced.Classes[12]);
+        var withSymbols = CharacterSet.Create(CharacterSetKind.Balanced, symbols: true);
+        Assert.Equal(CharacterSet.Balanced.Classes, withSymbols.Classes.Take(47));
+    }
+
+    [Fact]
+    public void EveryBuiltInSet_IsFoundAgainFromItsLabels()
+    {
+        foreach (var set in CharacterSet.Presets)
+            Assert.Same(set, CharacterSet.FromLabels([.. set.Classes]));
+    }
+
+    [Fact]
+    public void GlyphCache_RendersNewCharactersOnDemandAndRoundTrips()
+    {
+        var face = FontCatalog.Discover([FontVariant.Regular]).FirstOrDefault(f => f.Family == "Arial");
+        if (face is null)
+            return; // Arial is part of every Windows install; nothing to test without it.
+        var cache = new GlyphCache();
+        Assert.True(cache.EnsureRendered([face], "", threads: 2));
+        Assert.True(cache.TryGet(face, 'å', out _));
+        Assert.True(cache.TryGet(face, '€', out _));
+        Assert.False(cache.EnsureRendered([face], "Ä", threads: 2)); // part of the base characters
+        Assert.False(cache.TryGet(face, 'é', out _));
+        Assert.True(cache.EnsureRendered([face], "é", threads: 2));   // rendered on demand
+        Assert.True(cache.TryGet(face, 'é', out _));
+
+        string path = Path.Combine(Path.GetTempPath(), $"ocrnet-glyphs-{Guid.NewGuid():N}.bin");
+        try
+        {
+            cache.Save(path);
+            var loaded = GlyphCache.Load(path);
+            Assert.Equal(cache.Count, loaded.Count);
+            Assert.False(loaded.EnsureRendered([face], "é", threads: 2));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

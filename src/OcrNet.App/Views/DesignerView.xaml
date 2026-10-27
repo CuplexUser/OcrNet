@@ -8,6 +8,8 @@
     <UserControl.Resources>
         <sys:String x:Key="PresetHelp">A tuned starting point: sets the output classes, the hidden layers and the training settings together. Pick the one closest to what you want to recognize, then adjust.</sys:String>
         <sys:String x:Key="ClassesHelp">Each class gets one output neuron. More classes make the task harder: the network must draw finer distinctions, so it needs more capacity (wider layers), more samples per epoch and more epochs. Characters that look alike on their own (0/O, 1/l/I, c/C) cap the accuracy any network can reach.</sys:String>
+        <sys:String x:Key="SwedishHelp">Adds Å, Ä and Ö. In the Balanced set each is merged with its lowercase form, because after normalization they differ only in size; otherwise å, ä and ö get classes of their own. Fonts without these letters are skipped for them.</sys:String>
+        <sys:String x:Key="SymbolsHelp">Adds 18 symbols with distinctive shapes. Punctuation that differs only in size or position (. , ' " _) is left out: every character is scaled and centered before it reaches the network, so a comma and an apostrophe would look identical. Expect some confusion between look-alikes such as / and 1, or ( and C.</sys:String>
         <sys:String x:Key="UnitsHelp">Width: the number of neurons in this layer, i.e. how many different features it can detect. Too narrow underfits (training and validation accuracy both low). Too wide costs time in proportion and can memorize the training fonts (training accuracy well above validation). Keep every layer comfortably wider than the number of classes.</sys:String>
         <sys:String x:Key="ActivationHelp">The nonlinearity after the layer. ReLU: fast, the default. LeakyReLU: avoids neurons that stop learning, with similar accuracy. GELU: smooth, sometimes slightly better, but slower. Tanh/Sigmoid: saturate and learn slowly in hidden layers.</sys:String>
         <sys:String x:Key="DropoutHelp">The fraction of this layer's outputs randomly switched off on each training step (inference uses all of them). It makes the network generalize better to fonts and handwriting it has not seen. Typical values are 0.1–0.3; above 0.5 the network underfits. Wider layers tolerate more.</sys:String>
@@ -61,6 +63,12 @@
                         <TextBlock Text="Output classes" Style="{StaticResource SectionTitle}" ToolTip="{StaticResource ClassesHelp}" />
                         <ComboBox ItemsSource="{Binding CharacterSetNames}" SelectedItem="{Binding SelectedCharacterSetName}" HorizontalAlignment="Stretch"
                                   ToolTip="{StaticResource ClassesHelp}" />
+                        <StackPanel Margin="0,10,0,0" Visibility="{Binding IsCustomSet, Converter={StaticResource InverseBoolToVisibility}}">
+                            <CheckBox Content="Swedish letters  (Å Ä Ö)" IsChecked="{Binding IncludeSwedish}" IsEnabled="{Binding CanIncludeSwedish}"
+                                      ToolTip="{StaticResource SwedishHelp}" />
+                            <CheckBox Content="Symbols  (@ £ $ € % &amp; / ( ) ? ; : ! + - = # *)" IsChecked="{Binding IncludeSymbols}" Margin="0,4,0,0"
+                                      ToolTip="{StaticResource SymbolsHelp}" />
+                        </StackPanel>
                         <StackPanel Visibility="{Binding IsCustomSet, Converter={StaticResource BoolToVisibility}}" Margin="0,10,0,0">
                             <TextBlock Text="Characters (one class each)" Style="{StaticResource Caption}" Margin="0,0,0,4" />
                             <TextBox Text="{Binding CustomCharacters, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" />

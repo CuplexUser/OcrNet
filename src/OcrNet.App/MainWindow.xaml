@@ -50,7 +50,7 @@
                 <views:TrainingView DataContext="{Binding Training}" />
             </TabItem>
             <TabItem Header="4  Recognize">
-                <views:RecognizeView DataContext="{Binding Recognize}" />
+                <views:RecognizeView x:Name="RecognizePage" DataContext="{Binding Recognize}" />
             </TabItem>
             <TabItem Header="5  Visualize">
                 <views:VisualizeView DataContext="{Binding Visualize}" />

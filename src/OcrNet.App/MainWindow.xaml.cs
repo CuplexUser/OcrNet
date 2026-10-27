@@ -38,24 +38,12 @@ public partial class MainWindow : Window
         int snapshot = Array.IndexOf(args, "--snapshot");
         if (snapshot < 0 || snapshot + 1 >= args.Length)
             return;
-        int draw = Array.IndexOf(args, "--draw");
+        string? Option(string name) => Array.IndexOf(args, name) is var i and >= 0 && i + 1 < args.Length ? args[i + 1] : null;
         await SnapshotRunner.RunAsync(this, (MainViewModel)DataContext, args[snapshot + 1],
             train: args.Contains("--train"),
-            draw: text => FindChild<RecognizeView>(this)?.DrawText(text),
-            drawText: draw >= 0 && draw + 1 < args.Length ? args[draw + 1] : null);
-    }
-
-    private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
-    {
-        for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
-        {
-            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
-            if (child is T match)
-                return match;
-            if (FindChild<T>(child) is { } nested)
-                return nested;
-        }
-        return null;
+            recognize: RecognizePage,
+            drawText: Option("--draw"),
+            fontTestText: Option("--font-test"));
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)

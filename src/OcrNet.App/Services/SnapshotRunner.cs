@@ -8,13 +8,14 @@ using OcrNet.App.ViewModels;
 namespace OcrNet.App.Services;
 
 /// <summary>
-/// Developer smoke test: <c>OcrNet.App.exe --snapshot &lt;folder&gt; [--train] [--draw &lt;text&gt;]</c>
-/// optionally trains the default network briefly, draws a sample, renders every tab offscreen to
-/// PNG files and exits. Works without an interactive desktop (e.g. a locked session or CI).
+/// Developer smoke test: <c>OcrNet.App.exe --snapshot &lt;folder&gt; [--train] [--draw &lt;text&gt;] [--font-test &lt;text&gt;]</c>
+/// optionally trains the default network briefly, draws a sample, runs the font test, renders every
+/// tab offscreen to PNG files, checks that Esc clears the canvas (checks.txt) and exits. Works without an interactive desktop (e.g. a locked session or CI).
 /// </summary>
 public static class SnapshotRunner
 {
-    public static async Task RunAsync(Window window, MainViewModel vm, string folder, bool train, Action<string>? draw, string? drawText)
+    public static async Task RunAsync(Window window, MainViewModel vm, string folder, bool train, Views.RecognizeView? recognize,
+        string? drawText, string? fontTestText)
     {
         Directory.CreateDirectory(folder);
         await Idle();
@@ -25,11 +26,16 @@ public static class SnapshotRunner
             await vm.Training.StartCommand.ExecuteAsync(null);
             File.WriteAllLines(Path.Combine(folder, "training-log.txt"), vm.Training.Log.Reverse());
         }
-        if (draw is not null && drawText is not null)
+        if (fontTestText is not null)
+        {
+            vm.Recognize.FontTestText = fontTestText;
+            vm.Recognize.TestFontCommand.Execute(null);
+        }
+        if (recognize is not null && drawText is not null)
         {
             vm.SelectedTab = 3;
             await Idle();
-            draw(drawText);
+            recognize.DrawText(drawText);
             await Idle();
         }
 
@@ -44,6 +50,9 @@ public static class SnapshotRunner
                 SaveElement(full, window.Background, Path.Combine(folder, $"tab{tab + 1}-full.png"));
         }
 
+        if (recognize is not null && drawText is not null)
+            await CheckEscapeClearsCanvasAsync(window, vm, recognize, drawText, Path.Combine(folder, "checks.txt"));
+
         var dialog = new Views.MessageDialog("The current network has unsaved training. Replace it with a new, untrained network?",
             "OcrNet", MessageBoxButton.YesNoCancel, MessageBoxImage.Question) { Owner = window, ShowActivated = false };
         dialog.Show();
@@ -53,6 +62,41 @@ public static class SnapshotRunner
 
         vm.State.IsDirty = false; // nothing to save prompts about in a smoke test
         window.Close();
+    }
+
+    /// <summary>
+    /// Sends Esc from outside the Recognize view (the tab strip), the way it arrives after drawing
+    /// with the mouse, and records whether the canvas was cleared.
+    /// </summary>
+    private static async Task CheckEscapeClearsCanvasAsync(Window window, MainViewModel vm, Views.RecognizeView recognize, string drawText, string path)
+    {
+        vm.SelectedTab = 3;
+        await Idle();
+        recognize.DrawText(drawText);
+        await Idle();
+        int before = recognize.StrokeCount;
+        var tabs = FindDescendant<System.Windows.Controls.TabControl>(window)!;
+        tabs.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
+            PresentationSource.FromVisual(window)!, 0, System.Windows.Input.Key.Escape)
+        {
+            RoutedEvent = System.Windows.Input.Keyboard.KeyDownEvent,
+        });
+        await Idle();
+        int after = recognize.StrokeCount;
+        File.WriteAllText(path, $"Esc clears canvas: {(before > 0 && after == 0 ? "PASS" : "FAIL")} (strokes {before} -> {after}){Environment.NewLine}");
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+                return match;
+            if (FindDescendant<T>(child) is { } nested)
+                return nested;
+        }
+        return null;
     }
 
     private static async Task Idle() =>

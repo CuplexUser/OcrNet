@@ -1,7 +1,6 @@
 <UserControl x:Class="OcrNet.App.Views.RecognizeView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Focusable="True" KeyDown="OnKeyDown">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid Margin="4,12,4,8">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
@@ -19,8 +18,7 @@
                     <TextBlock Text="Draw here" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" Margin="0" />
                 </DockPanel>
                 <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Background="#0A0D11" ClipToBounds="True">
-                    <InkCanvas x:Name="Canvas" Background="Transparent" Cursor="Pen"
-                               StrokeCollected="OnStrokesChanged" StrokeErased="OnStrokesChanged">
+                    <InkCanvas x:Name="Canvas" Background="Transparent" Cursor="Pen">
                         <InkCanvas.Style>
                             <Style TargetType="InkCanvas">
                                 <Setter Property="Width" Value="380" />
@@ -121,19 +119,49 @@
                         <TextBlock Text="Test with an installed font" Style="{StaticResource SectionTitle}" />
                         <StackPanel Orientation="Horizontal">
                             <ComboBox ItemsSource="{Binding FontFamilies}" SelectedItem="{Binding SelectedFontFamily}" Width="220" />
-                            <TextBox Text="{Binding FontTestText}" Width="240" Margin="8,0" />
+                            <TextBox Text="{Binding FontTestText, UpdateSourceTrigger=PropertyChanged}" Width="240" Margin="8,0">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding TestFontCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
                             <Button Content="Classify" Command="{Binding TestFontCommand}" />
+                            <CheckBox Content="Only mistakes" IsChecked="{Binding ShowOnlyMistakes}" Margin="16,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
+                        <TextBlock Text="{Binding FontTestSummary}" Style="{StaticResource Caption}" Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
                         <ItemsControl ItemsSource="{Binding FontTestResults}" Margin="0,10,0,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Margin="0,0,10,10" Width="64">
-                                        <Image Source="{Binding Image}" Width="48" Height="48" RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                                        <TextBlock Text="{Binding Label}" HorizontalAlignment="Center" Style="{StaticResource Mono}" FontSize="11" />
-                                    </StackPanel>
+                                    <!-- Mistakes stand out: coral frame and tint, predicted character in coral. -->
+                                    <Border x:Name="Tile" Margin="0,0,8,8" Width="72" Padding="4,6" CornerRadius="6" BorderThickness="2"
+                                            BorderBrush="#332EC4B6" Background="Transparent" ToolTip="{Binding Details}">
+                                        <StackPanel>
+                                            <Image Source="{Binding Image}" Width="48" Height="48" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                            <TextBlock HorizontalAlignment="Center" FontFamily="{StaticResource MonoFont}" FontSize="15" Margin="0,4,0,0">
+                                                <Run Text="{Binding Expected, Mode=OneWay}" Foreground="{StaticResource TextBrush}" />
+                                                <Run Text="→" Foreground="{StaticResource TextMutedBrush}" FontSize="11" />
+                                                <Run x:Name="PredictedRun" Text="{Binding Predicted, Mode=OneWay}" Foreground="{StaticResource SignalBrush}" />
+                                            </TextBlock>
+                                            <TextBlock x:Name="Note" Text="{Binding Confidence, StringFormat={}{0:P0}}" HorizontalAlignment="Center"
+                                                       Style="{StaticResource Caption}" FontSize="10" />
+                                        </StackPanel>
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Outcome}" Value="Wrong">
+                                            <Setter TargetName="Tile" Property="BorderBrush" Value="{StaticResource NegativeBrush}" />
+                                            <Setter TargetName="Tile" Property="Background" Value="#33FF6B57" />
+                                            <Setter TargetName="PredictedRun" Property="Foreground" Value="{StaticResource NegativeBrush}" />
+                                            <Setter TargetName="PredictedRun" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Outcome}" Value="NotAClass">
+                                            <Setter TargetName="Tile" Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                                            <Setter TargetName="Tile" Property="Opacity" Value="0.45" />
+                                            <Setter TargetName="PredictedRun" Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                                            <Setter TargetName="Note" Property="Text" Value="not a class" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
