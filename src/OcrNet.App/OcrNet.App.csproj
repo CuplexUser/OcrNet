@@ -6,6 +6,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>OcrNet.App</RootNamespace>
     <AssemblyTitle>OcrNet</AssemblyTitle>
+    <ApplicationIcon>Assets\OcrNet.ico</ApplicationIcon>
     <TieredPGO>true</TieredPGO>
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
@@ -16,6 +17,10 @@
   <ItemGroup>
     <ProjectReference Include="..\OcrNet.Core\OcrNet.Core.csproj" />
     <ProjectReference Include="..\OcrNet.Data\OcrNet.Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\OcrNet.ico" />
   </ItemGroup>
 
   <ItemGroup>

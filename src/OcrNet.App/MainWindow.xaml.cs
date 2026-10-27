@@ -11,8 +11,25 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        FitToWorkArea();
         DataContext = new MainViewModel();
         Loaded += OnLoaded;
+    }
+
+    /// <summary>
+    /// Shrinks the default and minimum size to the screen's work area (excluding the taskbar), so the
+    /// title bar is always reachable on small or highly scaled displays.
+    /// </summary>
+    private void FitToWorkArea()
+    {
+        var area = SystemParameters.WorkArea;
+        const double margin = 24;
+        Width = Math.Min(Width, area.Width - margin);
+        Height = Math.Min(Height, area.Height - margin);
+        MinWidth = Math.Min(MinWidth, Width);
+        MinHeight = Math.Min(MinHeight, Height);
+        if (area.Width < 1280 || area.Height < 760)
+            WindowState = WindowState.Maximized;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -46,7 +63,7 @@ public partial class MainWindow : Window
         var vm = (MainViewModel)DataContext;
         if (vm.State.IsTraining)
         {
-            if (MessageBox.Show("Training is running. Stop it and quit?", "OcrNet",
+            if (MessageDialog.Show("Training is running. Stop it and quit?", "OcrNet",
                     MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             {
                 e.Cancel = true;

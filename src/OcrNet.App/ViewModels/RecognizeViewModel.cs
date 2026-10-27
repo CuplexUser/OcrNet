@@ -165,7 +165,9 @@ public sealed partial class RecognizeViewModel : ObservableObject
         var face = new FontFace(SelectedFontFamily, FontVariant.Regular, false, true, true, false);
         var normalizer = _state.Normalizer;
         int size = normalizer.OutputSize;
-        var glyphs = GlyphRenderer.RenderFace(face, FontTestText).ToDictionary(g => g.Character, g => g.Image);
+        // Render each distinct character once; repeated characters ("sss") reuse the same glyph.
+        var glyphs = GlyphRenderer.RenderFace(face, string.Concat(FontTestText.Distinct()))
+            .ToDictionary(g => g.Character, g => g.Image);
         foreach (char c in FontTestText.Where(c => !char.IsWhiteSpace(c)))
         {
             if (!glyphs.TryGetValue(c, out var image))

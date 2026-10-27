@@ -3,6 +3,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using OcrNet.App.Views;
 using OcrNet.App.Services;
 using OcrNet.Core.Serialization;
 
@@ -70,7 +71,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (!ConfirmDiscard())
             return;
         var dialog = new OpenFileDialog { Filter = FileFilter, Title = "Open model" };
-        if (dialog.ShowDialog() != true)
+        if (dialog.ShowDialog(Application.Current.MainWindow) != true)
             return;
         try
         {
@@ -83,7 +84,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or NotSupportedException or ArgumentException)
         {
-            MessageBox.Show($"Could not open the model:\n{ex.Message}", "OcrNet", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageDialog.Show($"Could not open the model:\n{ex.Message}", "OcrNet", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -105,7 +106,7 @@ public sealed partial class MainViewModel : ObservableObject
             Title = "Save model",
             FileName = SafeFileName(State.Network!.Metadata.Name) + ModelFile.Extension,
         };
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog(Application.Current.MainWindow) == true)
             SaveTo(dialog.FileName);
     }
 
@@ -120,7 +121,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show($"Could not save the model:\n{ex.Message}", "OcrNet", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageDialog.Show($"Could not save the model:\n{ex.Message}", "OcrNet", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -129,7 +130,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (!State.IsDirty || State.Network?.Metadata.History.Count is null or 0)
             return true;
-        var answer = MessageBox.Show("Save the trained network before continuing?", "OcrNet",
+        var answer = MessageDialog.Show("Save the trained network before continuing?", "OcrNet",
             MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         if (answer == MessageBoxResult.Yes)
             Save();

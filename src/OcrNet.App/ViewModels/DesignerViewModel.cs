@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using OcrNet.App.Views;
 using OcrNet.App.Services;
 using OcrNet.Core.Init;
 using OcrNet.Core.Layers;
@@ -102,6 +103,17 @@ public sealed partial class DesignerViewModel : ObservableObject
     [ObservableProperty]
     public partial string? Error { get; set; }
 
+    [ObservableProperty]
+    public partial string GuidanceTitle { get; set; } = "";
+
+    /// <summary>Recommended starting architecture for the selected output classes.</summary>
+    [ObservableProperty]
+    public partial string Recommendation { get; set; } = "";
+
+    /// <summary>Review of the current hidden layers against the selected output classes.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<DesignAdvice> Advice { get; set; } = [];
+
     public bool IsCustomSet => SelectedCharacterSetName == CustomSetName;
 
     public CharacterSet CurrentCharacterSet => IsCustomSet
@@ -166,12 +178,17 @@ public sealed partial class DesignerViewModel : ObservableObject
             double perSecond = Math.Min(25_000, 50e9 / (3.0 * network.FlopsPerSample));
             Summary = $"{network.ParameterCount:N0} parameters · {network.FlopsPerSample / 1e6:0.##} MFLOP per sample · " +
                       $"≈{samples / perSecond:0.#} s per epoch of {samples:N0} samples (rough estimate)";
+            var set = CurrentCharacterSet;
+            GuidanceTitle = $"Guidance for {set.Name} · {set.Count} classes";
+            Recommendation = DesignAdvisor.Recommend(set);
+            Advice = DesignAdvisor.Review(set, [.. Layers.Select(l => l.ToSpec())], WeightInit, network.ParameterCount);
         }
         catch (ArgumentException ex)
         {
             Preview = null;
             Error = ex.Message;
             Summary = "";
+            Advice = [];
         }
     }
 
@@ -207,11 +224,11 @@ public sealed partial class DesignerViewModel : ObservableObject
     {
         if (_state.IsTraining)
         {
-            MessageBox.Show("Stop training before building a new network.", "OcrNet");
+            MessageDialog.Show("Stop training before building a new network.", "OcrNet");
             return;
         }
         if (_state.Network is { } current && current.Metadata.History.Count > 0 && _state.IsDirty &&
-            MessageBox.Show("The current network has unsaved training. Replace it with a new, untrained network?",
+            MessageDialog.Show("The current network has unsaved training. Replace it with a new, untrained network?",
                 "OcrNet", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 

@@ -37,6 +37,14 @@ dotnet build OcrNet.sln -c Release
 dotnet run --project src/OcrNet.App -c Release
 ```
 
+To build a bundle you can copy to another machine:
+
+```powershell
+./build.ps1                    # tests, then publishes the app to dist\OcrNet\ (needs the .NET 10 Desktop Runtime)
+./build.ps1 -Zip               # also writes dist\OcrNet-<version>-win-x64.zip
+./build.ps1 -SelfContained     # includes the .NET runtime (about 150 MB larger)
+```
+
 On first launch the app renders every selected font's glyphs once (about 7 seconds for
 roughly 350 font faces) and caches them in `%LOCALAPPDATA%\OcrNet\glyphcache.bin`.
 
@@ -81,6 +89,16 @@ The window has five tabs.
   activations and Xavier for the others.
 - **Summary**: the parameter count, FLOPs per sample, and a rough per-epoch time estimate. An
   architecture diagram of the untrained network is shown next to it.
+- **Guidance**: reviews the hidden layers against the selected output classes. It recommends a
+  starting architecture for that number of classes and flags problems:
+  - layers too narrow for the class count, which create bottlenecks;
+  - designs that are too deep or too wide to be worth the extra training time;
+  - saturating activations, and heavy or missing dropout;
+  - a weight initialization that doesn't match the activations;
+  - look-alike characters that cap the accuracy of the chosen set.
+
+  An expandable section explains how each design parameter affects the result, and every control
+  has a tooltip with the same explanation.
 - **Build network**: replaces the current model with a freshly initialized one.
 
 ### 2. Dataset
@@ -188,6 +206,9 @@ src/OcrNet.App/                  WPF app (MVVM with CommunityToolkit.Mvvm, Fluen
   Services/                      AppState, Presets, InkRasterizer, BitmapFactory, SnapshotRunner
 tests/OcrNet.Core.Tests/         xUnit tests
 benchmarks/OcrNet.Bench/         console benchmark (GEMM, MLP training, data pipeline, end-to-end)
+tools/make-icon.cs               regenerates src/OcrNet.App/Assets/OcrNet.ico:
+                                 dotnet run tools/make-icon.cs -- src/OcrNet.App/Assets/OcrNet.ico
+build.ps1                        test + publish into dist\ (see Quick start)
 ```
 
 ---
@@ -360,8 +381,8 @@ OcrNet.App.exe --snapshot <folder> [--train] [--draw <text>]
 ```
 
 It optionally trains the current network for 3 epochs, optionally draws `<text>` on the Recognize
-canvas, then saves every tab as a PNG (plus a full-height capture of tabs that scroll) and
-`training-log.txt`, and exits.
+canvas, then saves every tab as a PNG (plus a full-height capture of tabs that scroll), a sample
+dialog as `dialog.png`, and `training-log.txt`, and exits.
 
 ---
 

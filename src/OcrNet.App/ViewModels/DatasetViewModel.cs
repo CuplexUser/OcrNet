@@ -5,6 +5,7 @@ using System.Windows.Data;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using OcrNet.App.Views;
 using OcrNet.App.Services;
 using OcrNet.Data.Datasets;
 using OcrNet.Data.Glyphs;
@@ -198,7 +199,7 @@ public sealed partial class DatasetViewModel : ObservableObject
     [RelayCommand]
     private void ClearUserSamples()
     {
-        if (MessageBox.Show("Delete all of your collected drawings?", "OcrNet", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        if (MessageDialog.Show("Delete all of your collected drawings?", "OcrNet", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
         _state.UserSamples.Clear();
         _state.UserSamples.Save(UserSampleStore.DefaultPath);

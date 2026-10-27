@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Markup;
 using System.Windows.Threading;
 
+using OcrNet.App.Views;
 namespace OcrNet.App;
 
 public partial class App : Application
@@ -23,7 +24,7 @@ public partial class App : Application
 
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        MessageBox.Show(e.Exception.Message, "OcrNet – unexpected error", MessageBoxButton.OK, MessageBoxImage.Error);
+        MessageDialog.Show(e.Exception.Message, "OcrNet – unexpected error", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }
 }

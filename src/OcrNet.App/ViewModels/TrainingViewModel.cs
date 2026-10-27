@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using OcrNet.App.Views;
 using OcrNet.App.Controls;
 using OcrNet.App.Services;
 using OcrNet.Core.Network;
@@ -158,7 +159,7 @@ public sealed partial class TrainingViewModel : ObservableObject
     {
         var current = _state.Network!;
         if (current.Metadata.History.Count > 0 &&
-            MessageBox.Show("Training from scratch discards the current weights and history. Continue?",
+            MessageDialog.Show("Training from scratch discards the current weights and history. Continue?",
                 "OcrNet", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
@@ -254,7 +255,7 @@ public sealed partial class TrainingViewModel : ObservableObject
         {
             Phase = "Failed";
             AddLog("Error: " + ex.Message);
-            MessageBox.Show(ex.Message, "OcrNet – training", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageDialog.Show(ex.Message, "OcrNet – training", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -342,14 +343,14 @@ public sealed partial class TrainingViewModel : ObservableObject
         var set = _state.CharacterSet;
         if (set.ClassOf('0') < 0)
         {
-            MessageBox.Show("MNIST contains digits; the current network has no digit classes.", "OcrNet");
+            MessageDialog.Show("MNIST contains digits; the current network has no digit classes.", "OcrNet");
             return;
         }
         var images = new OpenFileDialog { Title = "MNIST images (e.g. t10k-images-idx3-ubyte[.gz])", Filter = "IDX images|*idx3*|All files|*.*" };
-        if (images.ShowDialog() != true)
+        if (images.ShowDialog(Application.Current.MainWindow) != true)
             return;
         var labels = new OpenFileDialog { Title = "MNIST labels (e.g. t10k-labels-idx1-ubyte[.gz])", Filter = "IDX labels|*idx1*|All files|*.*", InitialDirectory = System.IO.Path.GetDirectoryName(images.FileName) };
-        if (labels.ShowDialog() != true)
+        if (labels.ShowDialog(Application.Current.MainWindow) != true)
             return;
 
         Phase = "Evaluating on MNIST…";
@@ -377,7 +378,7 @@ public sealed partial class TrainingViewModel : ObservableObject
         catch (Exception ex) when (ex is System.IO.IOException or System.IO.InvalidDataException)
         {
             Phase = "MNIST evaluation failed";
-            MessageBox.Show(ex.Message, "OcrNet – MNIST", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageDialog.Show(ex.Message, "OcrNet – MNIST", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 }

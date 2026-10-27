@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:OcrNet.App.Views"
         Title="{Binding State.WindowTitle}"
+        Icon="/Assets/OcrNet.ico"
         Width="1440" Height="920" MinWidth="1100" MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}"

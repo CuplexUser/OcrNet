@@ -43,6 +43,14 @@ public static class SnapshotRunner
             if (FindScrollContent(window) is { ActualHeight: > 0 } full && full.ActualHeight > ((FrameworkElement)window.Content).ActualHeight)
                 SaveElement(full, window.Background, Path.Combine(folder, $"tab{tab + 1}-full.png"));
         }
+
+        var dialog = new Views.MessageDialog("The current network has unsaved training. Replace it with a new, untrained network?",
+            "OcrNet", MessageBoxButton.YesNoCancel, MessageBoxImage.Question) { Owner = window, ShowActivated = false };
+        dialog.Show();
+        await Idle();
+        Save(dialog, Path.Combine(folder, "dialog.png"));
+        dialog.Close();
+
         vm.State.IsDirty = false; // nothing to save prompts about in a smoke test
         window.Close();
     }
